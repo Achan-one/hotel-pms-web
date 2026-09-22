@@ -4,7 +4,7 @@ import { pmsService } from './api/pmsService';
 import type { ReservationDetailDto } from './api/pmsService';
 import type { FloorMapResponseDto, LoginResponse, RoomMatrixItemDto } from './types/pms';
 import Sidebar, { type TabType } from './components/Sidebar';
-import ReservationDetailView from './components/ReservationDetailView.tsx';
+import ReservationDetailView from './components/ReservationDetailView';
 import {
   LogIn, RefreshCw, Hotel, Sparkles, Search, Settings, Clock
 } from 'lucide-react';
@@ -20,7 +20,7 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // 호텔 공식 시스템 영업일자 (Business Date - 기본값: 2026-09-20)
+  // 호텔 공식 시스템 영업일자 (Business Date)
   const [businessDate, setBusinessDate] = useState('2026-09-20');
 
   // 191실 룸 인디케이터
@@ -32,10 +32,11 @@ export default function App() {
   const [searchReservationId, setSearchReservationId] = useState('');
   const [searchCheckInDate, setSearchCheckInDate] = useState('');
   const [searchStayingDate, setSearchStayingDate] = useState('');
+  const [searchStatus, setSearchStatus] = useState('');
   const [reservationList, setReservationList] = useState<ReservationDetailDto[] | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
 
-  // 단독 고객 상세 관리 화면으로 전환될 대상 예약
+  // 고객 상세 화면으로 열릴 대상
   const [activeDetailReservation, setActiveDetailReservation] = useState<ReservationDetailDto | null>(null);
 
   // 1. 로그인
@@ -81,7 +82,7 @@ export default function App() {
     }
   };
 
-  // 4. 예약 검색 실행 (Lazy Load)
+  // 4. 예약 검색 실행 (조건부 Lazy Load)
   const handleSearchReservations = async (e?: SubmitEvent) => {
     if (e) e.preventDefault();
     setSearchLoading(true);
@@ -91,6 +92,7 @@ export default function App() {
         reservationId: searchReservationId.trim() || undefined,
         checkInDate: searchCheckInDate || undefined,
         stayingDate: searchStayingDate || undefined,
+        status: searchStatus || undefined,
       });
       setReservationList(list);
     } catch (err) {
@@ -168,13 +170,13 @@ export default function App() {
             activeTab={activeTab}
             onSelectTab={(tab) => {
               setActiveTab(tab);
-              setActiveDetailReservation(null); // 다른 탭 누르면 상세 화면 닫기
+              setActiveDetailReservation(null);
             }}
             onLogout={handleLogout}
         />
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {/* 시스템 공통 헤더: 호텔 공식 비즈니스 영업일자 표시 바 */}
+          {/* 시스템 상단 헤더: 호텔 비즈니스 영업일자 표시 바 */}
           <div style={{
             backgroundColor: '#0f172a', borderBottom: '1px solid #1e293b', padding: '0.75rem 2rem',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center'
@@ -192,11 +194,10 @@ export default function App() {
                   }}
               />
             </div>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>모든 체크인 및 룸체인지의 기준일자로 적용됩니다.</span>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>모든 체크인, 룸체인지, 배정의 기준일자로 사용됩니다.</span>
           </div>
 
           <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
-            {/* A. 상세 전용 페이지가 열려있을 경우 (단독 풀스크린 뷰) */}
             {activeDetailReservation ? (
                 <ReservationDetailView
                     reservation={activeDetailReservation}
@@ -208,7 +209,6 @@ export default function App() {
                     }}
                 />
             ) : (
-                /* B. 일반 탭 뷰 */
                 <>
                   {/* 탭 1: 룸 인디케이터 */}
                   {activeTab === 'INDICATOR' && (
@@ -261,16 +261,86 @@ export default function App() {
 
                   {/* 탭 2: 예약 검색 & 통합 관리 */}
                   {activeTab === 'RESERVATIONS' && (
-                      <div style={{ maxWidth: '1000px' }}>
+                      <div style={{ maxWidth: '1050px' }}>
                         <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>예약 검색 및 고객 통합 관리</h2>
-                        <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-                          조건을 입력하여 검색하세요. 투숙 중인 고객은 [재실 고객 체류 일자]를 지정하거나 고객명/예약번호로 바로 찾을 수 있습니다.
+                        <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.2rem' }}>
+                          실무 PMS처럼 상태 및 체류 기간별로 정밀 검색하고, 고객을 선택해 수동 배정 및 룸체인지를 진행합니다.
                         </p>
 
+                        {/* 1. 실무 퀵 필터 칩 바 */}
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                          <button
+                              type="button"
+                              onClick={() => {
+                                setSearchCheckInDate(businessDate);
+                                setSearchStayingDate('');
+                                setSearchStatus('');
+                                setSearchGuestName('');
+                                setSearchReservationId('');
+                              }}
+                              style={{ padding: '0.45rem 0.85rem', borderRadius: '20px', border: '1px solid #059669', backgroundColor: '#064e3b', color: '#a7f3d0', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            🟢 당일 도착(Arrivals: {businessDate})
+                          </button>
+                          <button
+                              type="button"
+                              onClick={() => {
+                                setSearchStayingDate(businessDate);
+                                setSearchCheckInDate('');
+                                setSearchStatus('CHECKED_IN');
+                                setSearchGuestName('');
+                                setSearchReservationId('');
+                              }}
+                              style={{ padding: '0.45rem 0.85rem', borderRadius: '20px', border: '1px solid #b91c1c', backgroundColor: '#450a0a', color: '#fecaca', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            🔴 현재 재실(In-House: {businessDate})
+                          </button>
+                          <button
+                              type="button"
+                              onClick={() => {
+                                setSearchStatus('ASSIGNED');
+                                setSearchCheckInDate('');
+                                setSearchStayingDate('');
+                                setSearchGuestName('');
+                                setSearchReservationId('');
+                              }}
+                              style={{ padding: '0.45rem 0.85rem', borderRadius: '20px', border: '1px solid #1d4ed8', backgroundColor: '#172554', color: '#bfdbfe', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            🔵 배정 완료(미입실)
+                          </button>
+                          <button
+                              type="button"
+                              onClick={() => {
+                                setSearchStatus('PENDING');
+                                setSearchCheckInDate('');
+                                setSearchStayingDate('');
+                                setSearchGuestName('');
+                                setSearchReservationId('');
+                              }}
+                              style={{ padding: '0.45rem 0.85rem', borderRadius: '20px', border: '1px solid #d97706', backgroundColor: '#451a03', color: '#fde68a', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            🟡 미배정(PENDING)
+                          </button>
+                          <button
+                              type="button"
+                              onClick={() => {
+                                setSearchStatus('CANCELLED');
+                                setSearchCheckInDate('');
+                                setSearchStayingDate('');
+                                setSearchGuestName('');
+                                setSearchReservationId('');
+                              }}
+                              style={{ padding: '0.45rem 0.85rem', borderRadius: '20px', border: '1px solid #475569', backgroundColor: '#1e293b', color: '#cbd5e1', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            ⚪ 취소 예약 목록
+                          </button>
+                        </div>
+
+                        {/* 2. 다조건 검색 폼 */}
                         <form onSubmit={handleSearchReservations} style={{ backgroundColor: '#1e293b', padding: '1.2rem', borderRadius: '8px', border: '1px solid #334155', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
                             <div>
-                              <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>예약자명</label>
+                              <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>예약자 성명</label>
                               <input
                                   type="text" placeholder="예: Tanaka, Kim, Sato" value={searchGuestName}
                                   onChange={(e) => setSearchGuestName(e.target.value)}
@@ -286,6 +356,21 @@ export default function App() {
                               />
                             </div>
                             <div>
+                              <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>예약 상태 구분</label>
+                              <select
+                                  value={searchStatus}
+                                  onChange={(e) => setSearchStatus(e.target.value)}
+                                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#fff' }}
+                              >
+                                <option value="">(전체 상태)</option>
+                                <option value="CHECKED_IN">투숙중 (CHECKED_IN)</option>
+                                <option value="ASSIGNED">배정완료 (ASSIGNED)</option>
+                                <option value="PENDING">접수 미배정 (PENDING)</option>
+                                <option value="CHECKED_OUT">퇴실완료 (CHECKED_OUT)</option>
+                                <option value="CANCELLED">예약취소 (CANCELLED)</option>
+                              </select>
+                            </div>
+                            <div>
                               <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>체크인 일자</label>
                               <input
                                   type="date" value={searchCheckInDate}
@@ -294,7 +379,7 @@ export default function App() {
                               />
                             </div>
                             <div>
-                              <label style={{ display: 'block', fontSize: '0.8rem', color: '#fbbf24', marginBottom: '4px' }}>재실 고객 체류 일자 (In-House)</label>
+                              <label style={{ display: 'block', fontSize: '0.8rem', color: '#fbbf24', marginBottom: '4px' }}>재실 체류일자 (In-House)</label>
                               <input
                                   type="date" value={searchStayingDate}
                                   onChange={(e) => setSearchStayingDate(e.target.value)}
@@ -308,7 +393,7 @@ export default function App() {
                                 type="button"
                                 onClick={() => {
                                   setSearchGuestName(''); setSearchReservationId('');
-                                  setSearchCheckInDate(''); setSearchStayingDate('');
+                                  setSearchCheckInDate(''); setSearchStayingDate(''); setSearchStatus('');
                                 }}
                                 style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid #475569', backgroundColor: 'transparent', color: '#94a3b8', cursor: 'pointer' }}
                             >
@@ -318,19 +403,20 @@ export default function App() {
                                 type="submit"
                                 style={{ padding: '0.5rem 1.5rem', borderRadius: '6px', border: 'none', backgroundColor: '#0284c7', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                             >
-                              <Search size={16} /> {searchLoading ? '검색 중...' : '검색'}
+                              <Search size={16} /> {searchLoading ? '조회 중...' : '검색'}
                             </button>
                           </div>
                         </form>
 
+                        {/* 3. 검색 결과 목록 */}
                         {reservationList === null ? (
                             <div style={{ textAlign: 'center', padding: '3.5rem', backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#94a3b8' }}>
                               <Search size={32} style={{ margin: '0 auto 10px auto', display: 'block', opacity: 0.5 }} />
-                              검색 조건을 입력한 후 [검색] 버튼을 눌러주세요.
+                              상단 퀵 필터 칩을 누르거나 검색 조건을 지정한 후 [검색]을 눌러주세요.
                             </div>
                         ) : reservationList.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '3.5rem', backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#94a3b8' }}>
-                              일치하는 예약 및 재실 고객 내역이 없습니다.
+                              검색 조건과 일치하는 예약 및 재실 고객이 없습니다.
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -356,7 +442,7 @@ export default function App() {
                                           onClick={() => setActiveDetailReservation(res)}
                                           style={{ padding: '0.5rem 1rem', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}
                                       >
-                                        <Settings size={16} /> 상세 / 룸체인지 페이지
+                                        <Settings size={16} /> 상세 / 변경 관리
                                       </button>
                                     </div>
                                   </div>
@@ -433,7 +519,7 @@ export default function App() {
                             <div>
                               <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#f87171' }}>3. 전체 데이터 초기화</h4>
                               <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                          인메모리에 등록된 모든 예약 및 배정 데이터를 깨끗하게 삭제합니다.
+                          인메모리에 등록된 모든 예약 및 191실 전체 객실 상태를 완전한 공실(VACANT)로 리셋합니다.
                         </span>
                             </div>
                             <button
