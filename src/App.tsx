@@ -20,14 +20,11 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // 호텔 공식 시스템 영업일자 (Business Date)
   const [businessDate, setBusinessDate] = useState('2026-09-20');
 
-  // 191실 룸 인디케이터
   const [indicatorData, setIndicatorData] = useState<FloorMapResponseDto | null>(null);
   const [indicatorLoading, setIndicatorLoading] = useState(false);
 
-  // PMS 실시간 검색 필터 상태
   const [searchGuestName, setSearchGuestName] = useState('');
   const [searchReservationId, setSearchReservationId] = useState('');
   const [searchCheckInDate, setSearchCheckInDate] = useState('');
@@ -35,10 +32,8 @@ export default function App() {
   const [searchStatus, setSearchStatus] = useState('');
   const [reservationList, setReservationList] = useState<ReservationDetailDto[]>([]);
 
-  // 고객 상세 화면 대상
   const [activeDetailReservation, setActiveDetailReservation] = useState<ReservationDetailDto | null>(null);
 
-  // 1. 로그인
   const handleLogin = async (e: SubmitEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -56,7 +51,6 @@ export default function App() {
     }
   };
 
-  // 2. 로그아웃
   const handleLogout = () => {
     localStorage.removeItem('hotel_pms_token');
     localStorage.removeItem('hotel_pms_user');
@@ -65,7 +59,6 @@ export default function App() {
     setActiveDetailReservation(null);
   };
 
-  // 3. 인디케이터 로드
   const fetchIndicator = useCallback(async () => {
     if (!currentUser) return;
     setIndicatorLoading(true);
@@ -79,7 +72,6 @@ export default function App() {
     }
   }, [currentUser, businessDate]);
 
-  // 4. [핵심] 타이핑 즉시 검색 실행 함수
   const executeSearch = useCallback(async (
       guestName = searchGuestName,
       rsvId = searchReservationId,
@@ -102,14 +94,12 @@ export default function App() {
     }
   }, [currentUser, searchGuestName, searchReservationId, searchCheckInDate, searchStayingDate, searchStatus]);
 
-  // 예약 탭 진입 시 초기 목록 로드
   useEffect(() => {
     if (activeTab === 'RESERVATIONS' && currentUser) {
       void executeSearch();
     }
   }, [activeTab, currentUser, executeSearch]);
 
-  // 5. 당일 일괄 배정
   const handleBatchAssign = async () => {
     if (!confirm(`${businessDate} 일자의 미배정 예약을 규칙 기반으로 일괄 자동 배정하시겠습니까?`)) return;
     try {
@@ -183,7 +173,6 @@ export default function App() {
         />
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {/* 상단 호텔 공식 영업일자 헤더 */}
           <div style={{ backgroundColor: '#0f172a', borderBottom: '1px solid #1e293b', padding: '0.75rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Clock size={16} color="#38bdf8" />
@@ -214,7 +203,6 @@ export default function App() {
                 />
             ) : (
                 <>
-                  {/* 탭 1: 룸 인디케이터 */}
                   {activeTab === 'INDICATOR' && (
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -263,7 +251,6 @@ export default function App() {
                       </div>
                   )}
 
-                  {/* 탭 2: 실시간 문자 검색 예약 관리 탭 */}
                   {activeTab === 'RESERVATIONS' && (
                       <div style={{ maxWidth: '1050px' }}>
                         <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>예약 검색 및 고객 통합 관리</h2>
@@ -271,7 +258,6 @@ export default function App() {
                           문자를 타이핑하는 즉시 실시간으로 필터링됩니다.
                         </p>
 
-                        {/* 퀵 필터 칩 바 */}
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem' }}>
                           <button
                               type="button"
@@ -325,7 +311,6 @@ export default function App() {
                           </button>
                         </div>
 
-                        {/* 실시간 타이핑 즉시 검색 폼 */}
                         <div style={{ backgroundColor: '#1e293b', padding: '1.2rem', borderRadius: '8px', border: '1px solid #334155', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
                             <div>
@@ -418,7 +403,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 검색 결과 리스트 */}
                         {reservationList.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#94a3b8' }}>
                               <Search size={28} style={{ margin: '0 auto 10px auto', display: 'block', opacity: 0.5 }} />
@@ -458,7 +442,6 @@ export default function App() {
                       </div>
                   )}
 
-                  {/* 탭 3: AI 일괄 배정 */}
                   {activeTab === 'BATCH_ASSIGN' && (
                       <div style={{ maxWidth: '600px', backgroundColor: '#1e293b', padding: '2rem', borderRadius: '10px', border: '1px solid #334155' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
@@ -474,7 +457,6 @@ export default function App() {
                       </div>
                   )}
 
-                  {/* 탭 4: 시뮬레이션 랩 */}
                   {activeTab === 'SIMULATION' && (
                       <div style={{ maxWidth: '800px', backgroundColor: '#1e293b', padding: '2rem', borderRadius: '10px', border: '1px solid #334155' }}>
                         <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>🧪 OTA & 채널 매니저(CMS) 연동 테스트 랩</h2>
@@ -499,17 +481,38 @@ export default function App() {
                             </button>
                           </div>
 
+                          {/* [신규] 50건 신규 + 30건 재실 대량 인입 버튼 */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', backgroundColor: '#0f172a', borderRadius: '8px', border: '1px solid #334155' }}>
                             <div>
-                              <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#f87171' }}>2. 전체 데이터 초기화</h4>
+                              <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#c084fc' }}>2. 신규 예약 50건 + 재실 고객 30건 대량 인입</h4>
+                              <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                          재실 투숙객 30명을 실물 룸 랙에 미리 점유시키고, AI가 분석할 신규 예약 50건을 한 번에 적재합니다.
+                        </span>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                  const res: any = await pmsService.bulkSimulate50And30();
+                                  alert(res.message || '대량 데이터 인입 완료!');
+                                  void fetchIndicator();
+                                  void executeSearch();
+                                }}
+                                style={{ padding: '0.6rem 1rem', backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              대량 인입 실행
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', backgroundColor: '#0f172a', borderRadius: '8px', border: '1px solid #334155' }}>
+                            <div>
+                              <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#f87171' }}>3. 전체 데이터 초기화</h4>
                               <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>모든 예약과 191실 객실 상태를 완전한 공실(VACANT)로 리셋합니다.</span>
                             </div>
                             <button
                                 onClick={async () => {
                                   if (!confirm('정말 모든 데이터를 초기화하시겠습니까?')) return;
                                   await pmsService.clearReservations();
+                                  setReservationList([]);
                                   void fetchIndicator();
-                                  void executeSearch();
                                   alert('모든 데이터가 초기화되었습니다.');
                                 }}
                                 style={{ padding: '0.6rem 1rem', backgroundColor: '#b91c1c', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
