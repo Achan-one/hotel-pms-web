@@ -78,7 +78,13 @@ export const pmsService = {
         return res.data;
     },
 
-    // 6. 현장 운영 오버라이드 갱신 (계약 원본 보존)
+    // 6. 객실 배정 취소 (방 빼기)
+    unassignRoom: async (reservationId: string) => {
+        const res = await apiClient.delete<ApiResponse<void>>(`/api/reservations/${reservationId}/assign`);
+        return res.data;
+    },
+
+    // 7. 현장 운영 오버라이드 갱신 (계약 원본 보존)
     updateOperationalOverride: async (reservationId: string, data: {
         operationalGuestName?: string;
         operationalCheckInDate?: string;
@@ -89,7 +95,7 @@ export const pmsService = {
         return res.data;
     },
 
-    // 7. 룸 체인지 실행
+    // 8. 룸 체인지 실행
     changeRoom: async (reservationId: string, targetRoomNumber: string, reason: string, moveDate?: string) => {
         const res = await apiClient.post<ApiResponse<unknown>>(`/api/reservations/${reservationId}/room-change`, {
             targetRoomNumber,
@@ -99,7 +105,7 @@ export const pmsService = {
         return res.data;
     },
 
-    // 8. 당일 일괄 배정
+    // 9. 당일 일괄 배정
     runBatchAssign: async (checkInDate: string) => {
         const res = await apiClient.post<ApiResponse<unknown>>('/api/reservations/batch-assign', {
             checkInDate,
@@ -107,20 +113,20 @@ export const pmsService = {
         return res.data;
     },
 
-    // 9. 체크인 실행
+    // 10. 체크인 실행
     checkIn: async (reservationId: string) => {
         const res = await apiClient.post<ApiResponse<void>>(`/api/reservations/${reservationId}/check-in`);
         return res.data;
     },
 
-    // 10. 체크아웃 실행
+    // 11. 체크아웃 실행
     checkOut: async (reservationId: string, checkOutDate?: string) => {
         const params = checkOutDate ? { checkOutDate } : {};
         const res = await apiClient.post<ApiResponse<void>>(`/api/reservations/${reservationId}/check-out`, null, { params });
         return res.data;
     },
 
-    // 11. 시뮬레이터 API
+    // 12. 시뮬레이터 API
     seedSampleReservations: async () => {
         const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/seed-samples');
         return res.data;
