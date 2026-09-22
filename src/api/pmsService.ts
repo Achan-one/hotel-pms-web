@@ -1,8 +1,14 @@
 import apiClient from './client';
 import type { ApiResponse, FloorMapResponseDto, LoginResponse } from '../types/pms';
 
+export interface TagPreferenceDto {
+    preferredTags: string[];
+    avoidTags: string[];
+}
+
 export interface ReservationDetailDto {
     reservationId: string;
+    // 1. [불변] OTA 원천 계약 정보
     originalGuestName?: string;
     bookedRoomType?: string;
     contractCheckInDate?: string;
@@ -10,6 +16,7 @@ export interface ReservationDetailDto {
     rawRequestText?: string;
     rawXmlPayload?: string;
 
+    // 2. [가변] 현장 운영 오버라이드
     operationalGuestName?: string;
     operationalCheckInDate?: string;
     operationalStayNights?: number;
@@ -17,6 +24,16 @@ export interface ReservationDetailDto {
     assignedRoomNumber: string | null;
     previousRoomNumber?: string | null;
 
+    // 3. AI 파싱 태그 및 선호도
+    tagPreference?: TagPreferenceDto;
+    preference?: {
+        floorPref?: string;
+        elevatorPref?: string;
+        cornerPref?: string;
+        preferQuiet?: boolean;
+    };
+
+    // 4. UI 및 공통 호환 필드
     guestName: string;
     roomType: string;
     checkInDate: string;

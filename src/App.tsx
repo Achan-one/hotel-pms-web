@@ -72,21 +72,22 @@ export default function App() {
     }
   }, [currentUser, businessDate]);
 
+  // [핵심 수정] 타이핑 즉시 정확한 파라미터로 실시간 검색 수행
   const executeSearch = useCallback(async (
-      guestName = searchGuestName,
-      rsvId = searchReservationId,
-      checkIn = searchCheckInDate,
-      staying = searchStayingDate,
-      status = searchStatus
+      gName = searchGuestName,
+      rId = searchReservationId,
+      cDate = searchCheckInDate,
+      sDate = searchStayingDate,
+      stat = searchStatus
   ) => {
     if (!currentUser) return;
     try {
       const list = await pmsService.getReservations({
-        guestName: guestName.trim() || undefined,
-        reservationId: rsvId.trim() || undefined,
-        checkInDate: checkIn || undefined,
-        stayingDate: staying || undefined,
-        status: status || undefined,
+        guestName: gName.trim() || undefined,
+        reservationId: rId.trim() || undefined,
+        checkInDate: cDate || undefined,
+        stayingDate: sDate || undefined,
+        status: stat || undefined,
       });
       setReservationList(list);
     } catch (err) {
@@ -262,8 +263,11 @@ export default function App() {
                           <button
                               type="button"
                               onClick={() => {
-                                setSearchCheckInDate(businessDate); setSearchStayingDate(''); setSearchStatus('');
-                                void executeSearch(searchGuestName, searchReservationId, businessDate, '', '');
+                                const newCI = searchCheckInDate === businessDate ? '' : businessDate;
+                                setSearchCheckInDate(newCI);
+                                setSearchStayingDate('');
+                                setSearchStatus('');
+                                void executeSearch(searchGuestName, searchReservationId, newCI, '', '');
                               }}
                               style={{ padding: '0.45rem 0.85rem', borderRadius: '20px', border: '1px solid #059669', backgroundColor: searchCheckInDate === businessDate ? '#059669' : '#064e3b', color: '#fff', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                           >
@@ -272,8 +276,12 @@ export default function App() {
                           <button
                               type="button"
                               onClick={() => {
-                                setSearchStayingDate(businessDate); setSearchCheckInDate(''); setSearchStatus('CHECKED_IN');
-                                void executeSearch(searchGuestName, searchReservationId, '', businessDate, 'CHECKED_IN');
+                                const newStay = searchStayingDate === businessDate ? '' : businessDate;
+                                const newStat = searchStatus === 'CHECKED_IN' ? '' : 'CHECKED_IN';
+                                setSearchStayingDate(newStay);
+                                setSearchCheckInDate('');
+                                setSearchStatus(newStat);
+                                void executeSearch(searchGuestName, searchReservationId, '', newStay, newStat);
                               }}
                               style={{ padding: '0.45rem 0.85rem', borderRadius: '20px', border: '1px solid #b91c1c', backgroundColor: searchStatus === 'CHECKED_IN' ? '#b91c1c' : '#450a0a', color: '#fff', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                           >
@@ -282,8 +290,10 @@ export default function App() {
                           <button
                               type="button"
                               onClick={() => {
-                                setSearchStatus('ASSIGNED'); setSearchCheckInDate(''); setSearchStayingDate('');
-                                void executeSearch(searchGuestName, searchReservationId, '', '', 'ASSIGNED');
+                                const newStat = searchStatus === 'ASSIGNED' ? '' : 'ASSIGNED';
+                                setSearchStatus(newStat);
+                                setSearchCheckInDate(''); setSearchStayingDate('');
+                                void executeSearch(searchGuestName, searchReservationId, '', '', newStat);
                               }}
                               style={{ padding: '0.45rem 0.85rem', borderRadius: '20px', border: '1px solid #1d4ed8', backgroundColor: searchStatus === 'ASSIGNED' ? '#1d4ed8' : '#172554', color: '#fff', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                           >
@@ -292,8 +302,10 @@ export default function App() {
                           <button
                               type="button"
                               onClick={() => {
-                                setSearchStatus('PENDING'); setSearchCheckInDate(''); setSearchStayingDate('');
-                                void executeSearch(searchGuestName, searchReservationId, '', '', 'PENDING');
+                                const newStat = searchStatus === 'PENDING' ? '' : 'PENDING';
+                                setSearchStatus(newStat);
+                                setSearchCheckInDate(''); setSearchStayingDate('');
+                                void executeSearch(searchGuestName, searchReservationId, '', '', newStat);
                               }}
                               style={{ padding: '0.45rem 0.85rem', borderRadius: '20px', border: '1px solid #d97706', backgroundColor: searchStatus === 'PENDING' ? '#d97706' : '#451a03', color: '#fff', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                           >
@@ -302,8 +314,10 @@ export default function App() {
                           <button
                               type="button"
                               onClick={() => {
-                                setSearchStatus('CANCELLED'); setSearchCheckInDate(''); setSearchStayingDate('');
-                                void executeSearch(searchGuestName, searchReservationId, '', '', 'CANCELLED');
+                                const newStat = searchStatus === 'CANCELLED' ? '' : 'CANCELLED';
+                                setSearchStatus(newStat);
+                                setSearchCheckInDate(''); setSearchStayingDate('');
+                                void executeSearch(searchGuestName, searchReservationId, '', '', newStat);
                               }}
                               style={{ padding: '0.45rem 0.85rem', borderRadius: '20px', border: '1px solid #475569', backgroundColor: searchStatus === 'CANCELLED' ? '#475569' : '#1e293b', color: '#fff', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                           >
@@ -481,7 +495,6 @@ export default function App() {
                             </button>
                           </div>
 
-                          {/* [신규] 50건 신규 + 30건 재실 대량 인입 버튼 */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', backgroundColor: '#0f172a', borderRadius: '8px', border: '1px solid #334155' }}>
                             <div>
                               <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#c084fc' }}>2. 신규 예약 50건 + 재실 고객 30건 대량 인입</h4>
