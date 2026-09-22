@@ -1,9 +1,9 @@
 import type { LoginResponse } from '../types/pms';
 import {
-    Hotel, Grid, Search, ArrowRightLeft, Sparkles, LogOut, UserCheck, Beaker
+    Hotel, Grid, Search, Sparkles, LogOut, UserCheck, Beaker
 } from 'lucide-react';
 
-export type TabType = 'INDICATOR' | 'RESERVATIONS' | 'ROOM_MOVE' | 'BATCH_ASSIGN' | 'SIMULATION';
+export type TabType = 'INDICATOR' | 'RESERVATIONS' | 'BATCH_ASSIGN' | 'SIMULATION';
 
 interface SidebarProps {
     currentUser: LoginResponse;
@@ -15,31 +15,22 @@ interface SidebarProps {
 export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout }: SidebarProps) {
     const menuItems: { id: TabType; label: string; icon: typeof Grid }[] = [
         { id: 'INDICATOR', label: '191실 룸 인디케이터', icon: Grid },
-        { id: 'RESERVATIONS', label: '예약 조회 & 체크인', icon: Search },
-        { id: 'ROOM_MOVE', label: '룸 체인지 센터', icon: ArrowRightLeft },
+        { id: 'RESERVATIONS', label: '예약 검색 & 통합 관리', icon: Search },
         { id: 'BATCH_ASSIGN', label: 'AI 당일 일괄 배정', icon: Sparkles },
         { id: 'SIMULATION', label: 'OTA/린칸 테스트 랩', icon: Beaker },
     ];
 
     return (
         <aside style={{
-            width: '260px',
-            backgroundColor: '#0f172a',
-            borderRight: '1px solid #1e293b',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            padding: '1.5rem 1rem',
-            height: '100vh',
-            position: 'sticky',
-            top: 0,
-            boxSizing: 'border-box'
+            width: '260px', backgroundColor: '#0f172a', borderRight: '1px solid #1e293b',
+            display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            padding: '1.5rem 1rem', height: '100vh', position: 'sticky', top: 0, boxSizing: 'border-box'
         }}>
             <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 0.5rem 1.5rem', borderBottom: '1px solid #1e293b', marginBottom: '1.5rem' }}>
                     <Hotel size={28} color="#38bdf8" />
                     <div>
-                        <h1 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, letterSpacing: '0.5px' }}>GRAND PMS</h1>
+                        <h1 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>GRAND PMS</h1>
                         <span style={{ fontSize: '0.7rem', color: '#64748b' }}>FRONT DESK SYSTEM</span>
                     </div>
                 </div>
@@ -53,20 +44,11 @@ export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout 
                                 key={item.id}
                                 onClick={() => onSelectTab(item.id)}
                                 style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                    width: '100%',
-                                    padding: '0.8rem 1rem',
-                                    borderRadius: '8px',
-                                    border: 'none',
+                                    display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
+                                    padding: '0.8rem 1rem', borderRadius: '8px', border: 'none',
                                     backgroundColor: isActive ? (item.id === 'SIMULATION' ? '#e11d48' : '#0284c7') : 'transparent',
-                                    color: isActive ? '#ffffff' : '#94a3b8',
-                                    fontWeight: isActive ? 700 : 500,
-                                    fontSize: '0.9rem',
-                                    cursor: 'pointer',
-                                    textAlign: 'left',
-                                    transition: 'all 0.15s ease'
+                                    color: isActive ? '#ffffff' : '#94a3b8', fontWeight: isActive ? 700 : 500,
+                                    fontSize: '0.9rem', cursor: 'pointer', textAlign: 'left'
                                 }}
                             >
                                 <Icon size={18} color={isActive ? '#ffffff' : '#94a3b8'} />
@@ -88,18 +70,9 @@ export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout 
                 <button
                     onClick={onLogout}
                     style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        width: '100%',
-                        padding: '0.5rem',
-                        borderRadius: '6px',
-                        backgroundColor: '#334155',
-                        color: '#f8fafc',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem'
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                        width: '100%', padding: '0.5rem', borderRadius: '6px', backgroundColor: '#334155',
+                        color: '#f8fafc', border: 'none', cursor: 'pointer', fontSize: '0.8rem'
                     }}
                 >
                     <LogOut size={14} /> 로그아웃

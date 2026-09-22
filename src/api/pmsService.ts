@@ -5,16 +5,30 @@ export interface ReservationDetailDto {
     reservationId: string;
     guestName: string;
     roomType: string;
-    roomTypeName: string;
+    bookedRoomType?: string;
     checkInDate: string;
     stayNights: number;
     assignedRoomNumber: string | null;
     status: string;
-    specialRequests: string;
+    rawRequestText?: string;
+    specialRequests?: string;
+    channelInfo?: {
+        channelType: string;
+        channelReservationNo: string;
+        planName: string;
+    };
+}
+
+export interface ReservationSearchParams {
+    guestName?: string;
+    reservationId?: string;
+    checkInDate?: string;
+    stayingDate?: string; // 특정 날짜 기준 재실(In-House) 고객 필터링
+    status?: string;
 }
 
 export const pmsService = {
-    // 1. 직원 로그인
+    // 1. 로그인
     login: async (staffId: string, password: string): Promise<LoginResponse> => {
         const res = await apiClient.post<ApiResponse<LoginResponse>>('/api/auth/login', {
             staffId,
@@ -23,29 +37,30 @@ export const pmsService = {
         return res.data.data;
     },
 
-    // 2. 191실 룸 인디케이터 매트릭스 조회
+    // 2. 191실 룸 인디케이터 매트릭스
     getRoomIndicator: async (targetDate?: string): Promise<FloorMapResponseDto> => {
         const params = targetDate ? { targetDate } : {};
         const res = await apiClient.get<ApiResponse<FloorMapResponseDto>>('/api/rooms/indicator', { params });
         return res.data.data;
     },
 
-    // 3. 예약 다조건 검색
-    getReservations: async (params: { targetDate?: string; guestName?: string; status?: string }): Promise<ReservationDetailDto[]> => {
+    // 3. 다조건 예약 검색
+    getReservations: async (params: ReservationSearchParams): Promise<ReservationDetailDto[]> => {
         const res = await apiClient.get<ApiResponse<ReservationDetailDto[]>>('/api/reservations', { params });
         return res.data.data;
     },
 
-    // 4. 단건 예약 상세
+    // 4. 단건 상세 조회
     getReservationDetail: async (reservationId: string): Promise<ReservationDetailDto> => {
         const res = await apiClient.get<ApiResponse<ReservationDetailDto>>(`/api/reservations/${reservationId}`);
         return res.data.data;
     },
 
     // 5. 룸 체인지 실행
-    changeRoom: async (reservationId: string, newRoomNumber: string, reason: string) => {
+    changeRoom: async (reservationId: string, targetRoomNumber: string, reason: string, moveDate?: string) => {
         const res = await apiClient.post<ApiResponse<unknown>>(`/api/reservations/${reservationId}/room-change`, {
-            newRoomNumber,
+            targetRoomNumber,
+            moveDate,
             reason,
         });
         return res.data;
@@ -72,7 +87,7 @@ export const pmsService = {
         return res.data;
     },
 
-    // pmsService 객체 내부에 추가
+    // 9. 시뮬레이터 API
     seedSampleReservations: async () => {
         const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/seed-samples');
         return res.data;
