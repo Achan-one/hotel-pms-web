@@ -348,6 +348,75 @@ export default function App() {
                 </button>
               </div>
           )}
+
+          {/* 탭 5: OTA/린칸 채널 매니저 시뮬레이션 랩 */}
+          {activeTab === 'SIMULATION' && (
+              <div style={{ maxWidth: '800px', backgroundColor: '#1e293b', padding: '2rem', borderRadius: '10px', border: '1px solid #334155' }}>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                  🧪 OTA & 채널 매니저(CMS) 연동 테스트 랩
+                </h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '2rem' }}>
+                  현장 PMS 연동 상황을 모의 실험합니다. 버튼을 클릭하면 백엔드 도메인 엔진과 스케줄 매트릭스에 즉시 반영됩니다.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', backgroundColor: '#0f172a', borderRadius: '8px', border: '1px solid #334155' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#38bdf8' }}>1. 기본 시나리오 샘플 데이터 세팅</h4>
+                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      2026-09-20 일자 기준 [배정완료 1건, 재실(체크인) 1건, 미배정 3건]을 일괄 주입합니다.
+                    </span>
+                    </div>
+                    <button
+                        onClick={async () => {
+                          await pmsService.seedSampleReservations();
+                          alert('기본 샘플 데이터 주입 완료! 룸 인디케이터나 예약 탭에서 확인해 보세요.');
+                        }}
+                        style={{ padding: '0.6rem 1rem', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      데이터 주입
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', backgroundColor: '#0f172a', borderRadius: '8px', border: '1px solid #334155' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#34d399' }}>2. TL-Lincoln(린칸) XML 신규 예약 전문 수신 모의</h4>
+                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      일본 OTA 채널 매니저인 TL-Lincoln의 XML 통지를 수신하여 미배정 예약으로 자동 등록합니다.
+                    </span>
+                    </div>
+                    <button
+                        onClick={async () => {
+                          await pmsService.simulateLincoln();
+                          alert('린칸 XML 전문이 파싱되어 신규 예약(Yamamoto Daiki)이 등록되었습니다!');
+                        }}
+                        style={{ padding: '0.6rem 1rem', backgroundColor: '#059669', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      XML 수신 트리거
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', backgroundColor: '#0f172a', borderRadius: '8px', border: '1px solid #334155' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#f87171' }}>3. 전체 데이터 초기화</h4>
+                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      인메모리에 등록된 모든 예약 및 배정 데이터를 깨끗하게 삭제합니다.
+                    </span>
+                    </div>
+                    <button
+                        onClick={async () => {
+                          if (!confirm('정말 모든 데이터를 초기화하시겠습니까?')) return;
+                          await pmsService.clearReservations();
+                          alert('모든 데이터가 초기화되었습니다.');
+                        }}
+                        style={{ padding: '0.6rem 1rem', backgroundColor: '#b91c1c', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      전체 초기화
+                    </button>
+                  </div>
+                </div>
+              </div>
+          )}
         </main>
       </div>
   );

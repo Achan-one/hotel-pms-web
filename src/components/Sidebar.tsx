@@ -1,9 +1,9 @@
 import type { LoginResponse } from '../types/pms';
 import {
-    Hotel, Grid, Search, ArrowRightLeft, Sparkles, LogOut, UserCheck
+    Hotel, Grid, Search, ArrowRightLeft, Sparkles, LogOut, UserCheck, Beaker
 } from 'lucide-react';
 
-export type TabType = 'INDICATOR' | 'RESERVATIONS' | 'ROOM_MOVE' | 'BATCH_ASSIGN';
+export type TabType = 'INDICATOR' | 'RESERVATIONS' | 'ROOM_MOVE' | 'BATCH_ASSIGN' | 'SIMULATION';
 
 interface SidebarProps {
     currentUser: LoginResponse;
@@ -18,6 +18,7 @@ export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout 
         { id: 'RESERVATIONS', label: '예약 조회 & 체크인', icon: Search },
         { id: 'ROOM_MOVE', label: '룸 체인지 센터', icon: ArrowRightLeft },
         { id: 'BATCH_ASSIGN', label: 'AI 당일 일괄 배정', icon: Sparkles },
+        { id: 'SIMULATION', label: 'OTA/린칸 테스트 랩', icon: Beaker },
     ];
 
     return (
@@ -34,7 +35,6 @@ export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout 
             top: 0,
             boxSizing: 'border-box'
         }}>
-            {/* 상단 로고 & 메뉴 */}
             <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 0.5rem 1.5rem', borderBottom: '1px solid #1e293b', marginBottom: '1.5rem' }}>
                     <Hotel size={28} color="#38bdf8" />
@@ -60,7 +60,7 @@ export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout 
                                     padding: '0.8rem 1rem',
                                     borderRadius: '8px',
                                     border: 'none',
-                                    backgroundColor: isActive ? '#0284c7' : 'transparent',
+                                    backgroundColor: isActive ? (item.id === 'SIMULATION' ? '#e11d48' : '#0284c7') : 'transparent',
                                     color: isActive ? '#ffffff' : '#94a3b8',
                                     fontWeight: isActive ? 700 : 500,
                                     fontSize: '0.9rem',
@@ -77,7 +77,6 @@ export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout 
                 </nav>
             </div>
 
-            {/* 하단 로그인 근무자 프로필 및 로그아웃 */}
             <div style={{ backgroundColor: '#1e293b', padding: '1rem', borderRadius: '8px', border: '1px solid #334155' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem' }}>
                     <UserCheck size={16} color="#38bdf8" />

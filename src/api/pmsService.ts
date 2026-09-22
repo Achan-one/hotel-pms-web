@@ -71,4 +71,20 @@ export const pmsService = {
         const res = await apiClient.post<ApiResponse<void>>(`/api/reservations/${reservationId}/check-out`, null, { params });
         return res.data;
     },
+
+    // pmsService 객체 내부에 추가
+    seedSampleReservations: async () => {
+        const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/seed-samples');
+        return res.data;
+    },
+
+    simulateLincoln: async () => {
+        const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/lincoln-mock');
+        return res.data;
+    },
+
+    clearReservations: async () => {
+        const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/clear');
+        return res.data;
+    },
 };
