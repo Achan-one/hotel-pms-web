@@ -55,6 +55,19 @@ export interface ReservationSearchParams {
   tag?: string;
 }
 
+// 📥 브라우저 파일 다운로드 트리거 헬퍼 함수
+function triggerFileDownload(blobData: BlobPart, fileName: string) {
+  const blob = new Blob([blobData], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', fileName);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 export const pmsService = {
   // 인증
   login: async (staffId: string, password: string): Promise<LoginResponse> => {
@@ -176,6 +189,58 @@ export const pmsService = {
   updateOperationalTags: async (reservationId: string, data: { preferredTags: string[]; avoidTags: string[] }) => {
     const res = await apiClient.patch<ApiResponse<void>>(`/api/reservations/${reservationId}/operational-tags`, data);
     return res.data;
+  },
+
+  // =========================================================================
+  // 실무 보고서 CSV 엑스포트 메서드 3종
+  // =========================================================================
+
+  /**
+   * 1. 숙박자(In-House) 리스트 CSV 다운로드
+   */
+  downloadInHouseCsv: async (targetDate: string) => {
+    const res = await apiClient.get('/api/reports/in-house/csv', {
+      params: { targetDate },
+      responseType: 'blob',
+    });
+    triggerFileDownload(res.data, `숙박자리스트_${targetDate}.csv`);
+  },
+
+  /**
+   * 2. 예약자(Bookings) 리스트 CSV 다운로드
+   */
+  downloadReservationsCsv: async (startDate: string, status?: string) => {
+    const res = await apiClient.get('/api/reports/reservations/csv', {
+      params: { startDate, status: status || undefined },
+      responseType: 'blob',
+    });
+    triggerFileDownload(res.data, `예약자리스트_${startDate}.csv`);
+  },
+
+  /**
+   * 3. 태그 & 스페셜 리퀘스트 리스트 CSV 다운로드
+   */
+  downloadSpecialRequestsCsv: async (targetDate: string) => {
+    const res = await apiClient.get('/api/reports/special-requests/csv', {
+      params: { targetDate },
+      responseType: 'blob',
+    });
+    triggerFileDownload(res.data, `태그_요청사항리스트_${targetDate}.csv`);
+  },
+  // 4. 191실 객실별 보유 태그 인벤토리 CSV
+  downloadRoomTagsCsv: async () => {
+    const res = await apiClient.get('/api/reports/room-tags/csv', {
+      responseType: 'blob',
+    });
+    triggerFileDownload(res.data, '191실_객실별_보유태그인벤토리.csv');
+  },
+
+  // 5. 태그 기준 객실 매핑 매트릭스 CSV
+  downloadTagMatrixCsv: async () => {
+    const res = await apiClient.get('/api/reports/tag-matrix/csv', {
+      responseType: 'blob',
+    });
+    triggerFileDownload(res.data, '태그별_보유객실매핑_매트릭스.csv');
   },
 };
 

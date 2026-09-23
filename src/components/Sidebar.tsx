@@ -1,9 +1,9 @@
 import type { LoginResponse } from '../types/pms';
 import {
-    Hotel, Grid, Search, Sparkles, LogOut, UserCheck, Beaker, Tag
+    Hotel, Grid, Search, Sparkles, LogOut, UserCheck, Beaker, Tag, FileDown
 } from 'lucide-react';
 
-export type TabType = 'INDICATOR' | 'RESERVATIONS' | 'BATCH_ASSIGN' | 'TAGS' | 'SIMULATION';
+export type TabType = 'INDICATOR' | 'RESERVATIONS' | 'BATCH_ASSIGN' | 'TAGS' | 'EXPORT' | 'SIMULATION';
 
 interface SidebarProps {
     currentUser: LoginResponse;
@@ -18,6 +18,7 @@ export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout 
         { id: 'RESERVATIONS', label: '예약 검색 & 통합 관리', icon: Search },
         { id: 'BATCH_ASSIGN', label: 'AI 당일 일괄 배정', icon: Sparkles },
         { id: 'TAGS', label: '태그 사전 관리 (Admin)', icon: Tag },
+        { id: 'EXPORT', label: '데이터 엑스포트 (CSV)', icon: FileDown },
         { id: 'SIMULATION', label: 'OTA/린칸 테스트 랩', icon: Beaker },
     ];
 

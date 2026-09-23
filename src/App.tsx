@@ -7,6 +7,7 @@ import Sidebar, { type TabType } from './components/Sidebar';
 import ReservationDetailView from './components/ReservationDetailView';
 import ReservationGridView from './components/ReservationGridView';
 import TagManagementView from './components/TagManagementView';
+import ExportReportView from './components/ExportReportView';
 import {
   LogIn, RefreshCw, Hotel, Sparkles, Clock, Plus, Trash2, ListChecks, CheckCircle2, AlertCircle
 } from 'lucide-react';
@@ -37,9 +38,9 @@ export default function App() {
   const [customRequirementInput, setCustomRequirementInput] = useState('');
   const [customRequirements, setCustomRequirements] = useState<string[]>([
     '오션뷰나 바다 전망이 보이는 방으로 주세요.',
-    '창문에는 귀신이 있어요.',
     '휠체어 이용 예정입니다. 배리어프리 방 필수입니다.',
     '고층에 엘리베이터에서 멀리 떨어진 조용한 방 희망',
+    '어르신이 계셔서 이동하기 편한 낮은 층과 엘리베이터 근처 부탁드립니다.',
   ]);
 
   const isNavigatingRef = useRef(false);
@@ -239,7 +240,7 @@ export default function App() {
       )}
 
       {/* 사이드바 */}
-      <div style={{ flexShrink: 0, width: '240px', height: '100vh' }}>
+      <div style={{ flexShrink: 0, width: '260px', height: '100vh' }}>
         <Sidebar currentUser={currentUser} activeTab={activeTab} onSelectTab={(tab) => navigateTo(tab, null)} onLogout={handleLogout} />
       </div>
 
@@ -430,7 +431,10 @@ export default function App() {
               {/* 4. 태그 사전 관리 탭 */}
               {activeTab === 'TAGS' && <TagManagementView />}
 
-              {/* 5. OTA/린칸 테스트 랩 탭 */}
+              {/* 5. 📥 신규 데이터 엑스포트(CSV) 탭 */}
+              {activeTab === 'EXPORT' && <ExportReportView businessDate={businessDate} />}
+
+              {/* 6. OTA/린칸 테스트 랩 탭 */}
               {activeTab === 'SIMULATION' && (
                 <div style={{ maxWidth: '900px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   <div style={{ backgroundColor: '#131d36', padding: '2rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
@@ -454,7 +458,7 @@ export default function App() {
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '1.2rem' }}>
                       <input
                         type="text"
-                        placeholder="예: 창문에는 귀신이 있어요."
+                        placeholder="예: 롯데 월드타워 전망이 보이는 방으로 주세요."
                         value={customRequirementInput}
                         onChange={(e) => setCustomRequirementInput(e.target.value)}
                         onKeyDown={(e) => {

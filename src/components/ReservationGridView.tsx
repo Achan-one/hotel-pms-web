@@ -14,36 +14,65 @@ interface Props {
 type SortField = 'roomNumber' | 'guestName' | 'reservationId' | 'checkInDate' | 'stayNights' | 'status';
 type SortOrder = 'asc' | 'desc';
 
+// 💾 정렬 및 검색 필터 상태 유지용 세션 키
+const GRID_STATE_SESSION_KEY = 'PMS_RESERVATION_GRID_STATE_V1';
+
 export default function ReservationGridView({ businessDate, onSelectReservation }: Props) {
+  // 1. 상세 페이지에서 돌아왔을 때 직전 상태 복원 (없으면 기본값)
+  const savedState = useMemo(() => {
+    try {
+      const saved = sessionStorage.getItem(GRID_STATE_SESSION_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore JSON parse error
+    }
+    return {};
+  }, []);
+
   const [reservationList, setReservationList] = useState<ReservationDetailDto[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 검색 조건
-  const [searchGuestName, setSearchGuestName] = useState('');
-  const [searchReservationId, setSearchReservationId] = useState('');
-  const [searchCheckInDate, setSearchCheckInDate] = useState('');
-  const [searchStayingDate, setSearchStayingDate] = useState('');
-  const [searchStatus, setSearchStatus] = useState('');
-  const [searchTag, setSearchTag] = useState('');
+  // 검색 조건 (저장된 값 우선 적용)
+  const [searchGuestName, setSearchGuestName] = useState<string>(savedState.guestName ?? '');
+  const [searchReservationId, setSearchReservationId] = useState<string>(savedState.reservationId ?? '');
+  const [searchCheckInDate, setSearchCheckInDate] = useState<string>(savedState.checkInDate ?? '');
+  const [searchStayingDate, setSearchStayingDate] = useState<string>(savedState.stayingDate ?? '');
+  const [searchStatus, setSearchStatus] = useState<string>(savedState.status ?? '');
+  const [searchTag, setSearchTag] = useState<string>(savedState.tag ?? '');
 
   // 🏷️ 태그 팝오버 및 카탈로그
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   const [registeredTags, setRegisteredTags] = useState<Array<{ code: string; name: string }>>([]);
 
-  // 정렬
-  const [sortField, setSortField] = useState<SortField>('roomNumber');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  // 🔄 정렬 조건 (상세 페이지에서 복귀 시 직전 정렬 상태 복원)
+  const [sortField, setSortField] = useState<SortField>(savedState.sortField ?? 'roomNumber');
+  const [sortOrder, setSortOrder] = useState<SortOrder>(savedState.sortOrder ?? 'asc');
 
-  // 태그 사전 목록 로드
+  // 2. 정렬이나 검색 조건이 바뀔 때마다 세션 스토리지에 동기화
+  useEffect(() => {
+    sessionStorage.setItem(GRID_STATE_SESSION_KEY, JSON.stringify({
+      guestName: searchGuestName,
+      reservationId: searchReservationId,
+      checkInDate: searchCheckInDate,
+      stayingDate: searchStayingDate,
+      status: searchStatus,
+      tag: searchTag,
+      sortField,
+      sortOrder
+    }));
+  }, [searchGuestName, searchReservationId, searchCheckInDate, searchStayingDate, searchStatus, searchTag, sortField, sortOrder]);
+
+  // 태그 사전 조회
   useEffect(() => {
     apiClient.get('/api/admin/tags')
       .then((res) => {
         const list = res.data?.data || [];
         setRegisteredTags(list.map((t: any) => ({ code: t.code, name: t.name })));
       })
-      .catch(() => console.error('태그 사전 로드 실패'));
+      .catch(() => console.error('태그 사전 목록 로드 실패'));
   }, []);
 
+  // 검색 실행 함수
   const executeSearch = useCallback(async (
     gName = searchGuestName,
     rId = searchReservationId,
@@ -83,11 +112,10 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
     }
   };
 
-  // 💡 [핵심] 백엔드 필터링 + 프론트엔드 즉각 매칭 2중 방어 필터링
+  // 클라이언트 메모리 즉각 필터링 + 정렬
   const filteredAndSortedList = useMemo(() => {
     let result = [...reservationList];
 
-    // 태그 필터가 켜져 있으면 클라이언트 메모리 상에서도 완벽 일치 보장
     if (searchTag.trim()) {
       const q = searchTag.trim().toUpperCase();
       result = result.filter(r => {
@@ -98,7 +126,6 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
       });
     }
 
-    // 정렬 수행
     return result.sort((a, b) => {
       let valA: string | number = '';
       let valB: string | number = '';
@@ -159,7 +186,7 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
       
-      {/* 1. 상단 바 */}
+      {/* 1. 상단 바: 타이틀 & 초기화 버튼 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: '#f8fafc' }}>
@@ -170,11 +197,14 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
           </span>
         </div>
 
+        {/* 🔄 조건 초기화 클릭 시 세션 저장소도 함께 클리어 */}
         <button
           type="button"
           onClick={() => {
+            sessionStorage.removeItem(GRID_STATE_SESSION_KEY);
             setSearchGuestName(''); setSearchReservationId(''); setSearchCheckInDate('');
             setSearchStayingDate(''); setSearchStatus(''); setSearchTag('');
+            setSortField('roomNumber'); setSortOrder('asc');
             void executeSearch('', '', '', '', '', '');
           }}
           style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.35rem 0.75rem', borderRadius: '5px', border: '1px solid rgba(255, 255, 255, 0.12)', backgroundColor: '#131d36', color: '#94a3b8', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
@@ -226,7 +256,7 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
             }}
           >
             <TagIcon size={12} />
-            {searchTag ? `필터 태그: ${searchTag}` : '🏷️ 태그 카탈로그 필터...'}
+            {searchTag ? `선택 태그: ${searchTag}` : '🏷️ 태그 카탈로그 필터...'}
           </button>
 
           {isTagPopoverOpen && (
@@ -287,7 +317,7 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
         </div>
       </div>
 
-      {/* 3. 인풋 필터 바 */}
+      {/* 3. 인풋 필터 바 5열 */}
       <div style={{ backgroundColor: '#131d36', padding: '0.8rem 1rem', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
           <div>
@@ -344,14 +374,14 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
         </div>
       </div>
 
-      {/* 4. 📋 단정형 PMS 테이블 (white-space: nowrap 적용) */}
+      {/* 4. 단정형 PMS 테이블 */}
       <div style={{ backgroundColor: '#131d36', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 1rem', backgroundColor: '#0b1329', borderBottom: '1px solid #293548' }}>
           <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
             조회 결과: <b style={{ color: '#38bdf8' }}>{filteredAndSortedList.length}</b>건
           </span>
           <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
-            헤더(호실/상태/성명/일정) 클릭 시 즉시 정렬
+            선택한 정렬 컬럼/방향은 상세 페이지를 다녀와도 그대로 유지됩니다
           </span>
         </div>
 
