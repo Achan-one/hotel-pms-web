@@ -5,6 +5,7 @@ import type { ReservationDetailDto } from './api/pmsService';
 import type { FloorMapResponseDto, LoginResponse, RoomMatrixItemDto } from './types/pms';
 import Sidebar, { type TabType } from './components/Sidebar';
 import ReservationDetailView from './components/ReservationDetailView';
+import TagManagementView from './components/TagManagementView';
 import {
   LogIn, RefreshCw, Hotel, Sparkles, Search, Settings, Clock
 } from 'lucide-react';
@@ -51,13 +52,22 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem('hotel_pms_token');
     localStorage.removeItem('hotel_pms_user');
     setCurrentUser(null);
     setIndicatorData(null);
     setActiveDetailReservation(null);
-  };
+  }, []);
+
+  // client.ts의 401 이벤트 수신 시 안전하게 로그인 화면으로 복귀
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      handleLogout();
+    };
+    window.addEventListener('auth-unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth-unauthorized', handleUnauthorized);
+  }, [handleLogout]);
 
   const fetchIndicator = useCallback(async () => {
     if (!currentUser) return;
@@ -72,7 +82,7 @@ export default function App() {
     }
   }, [currentUser, businessDate]);
 
-  // [핵심 수정] 타이핑 즉시 정확한 파라미터로 실시간 검색 수행
+  // 실시간 검색 수행
   const executeSearch = useCallback(async (
       gName = searchGuestName,
       rId = searchReservationId,
@@ -147,7 +157,7 @@ export default function App() {
             {loginError && <div style={{ backgroundColor: '#7f1d1d', color: '#fecaca', padding: '0.75rem', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '1rem' }}>{loginError}</div>}
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.5rem' }}>직원 ID</label>
-              <input type="text" value={staffId} onChange={(e) => setStaffId(e.target.value)} placeholder="예: staff" style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#fff' }} required />
+              <input type="text" value={staffId} onChange={(e) => setStaffId(e.target.value)} placeholder="예: admin" style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#fff' }} required />
             </div>
             <div style={{ marginBottom: '1.5rem' }}>
               <label style={{ display: 'block', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.5rem' }}>비밀번호</label>
@@ -470,6 +480,9 @@ export default function App() {
                         </button>
                       </div>
                   )}
+
+                  {/* 태그 사전 관리 탭 추가 */}
+                  {activeTab === 'TAGS' && <TagManagementView />}
 
                   {activeTab === 'SIMULATION' && (
                       <div style={{ maxWidth: '800px', backgroundColor: '#1e293b', padding: '2rem', borderRadius: '10px', border: '1px solid #334155' }}>

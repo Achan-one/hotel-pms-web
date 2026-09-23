@@ -17,7 +17,7 @@ apiClient.interceptors.request.use((config) => {
     return config;
 });
 
-// 응답 인터셉터: 401 Unauthorized 처리
+// 응답 인터셉터: 401 Unauthorized 발생 시 스토리지 정리 및 리셋 이벤트 발송
 apiClient.interceptors.response.use(
     (response) => response,
     (error) => {
