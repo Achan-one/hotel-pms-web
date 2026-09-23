@@ -52,6 +52,7 @@ export interface ReservationSearchParams {
   checkInDate?: string;
   stayingDate?: string;
   status?: string;
+  tag?: string;
 }
 
 export const pmsService = {
@@ -171,6 +172,10 @@ export const pmsService = {
   },
   clearAllSimulationData: async () => {
     return pmsService.clearReservations();
+  },
+  updateOperationalTags: async (reservationId: string, data: { preferredTags: string[]; avoidTags: string[] }) => {
+    const res = await apiClient.patch<ApiResponse<void>>(`/api/reservations/${reservationId}/operational-tags`, data);
+    return res.data;
   },
 };
 
