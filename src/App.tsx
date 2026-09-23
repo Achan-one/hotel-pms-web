@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { SubmitEvent } from 'react';
 import { pmsService } from './api/pmsService';
 import type { ReservationDetailDto } from './api/pmsService';
@@ -35,13 +35,49 @@ export default function App() {
 
   const [activeDetailReservation, setActiveDetailReservation] = useState<ReservationDetailDto | null>(null);
 
-  // 🧪 [신규] 테스트 케이스 커스텀 요구사항 목록 상태
+  // 🧪 테스트 케이스 커스텀 요구사항 목록
   const [customRequirementInput, setCustomRequirementInput] = useState('');
   const [customRequirements, setCustomRequirements] = useState<string[]>([
     '오션뷰나 바다 전망이 보이는 방으로 주세요.',
     '휠체어 이용 예정입니다. 배리어프리 방 필수입니다.',
     '고층에 엘리베이터에서 멀리 떨어진 조용한 방 희망',
   ]);
+
+  // 뒤로 가기 상태 보존용 Ref
+  const isNavigatingRef = useRef(false);
+
+  const navigateTo = useCallback((tab: TabType, detail: ReservationDetailDto | null = null) => {
+    setActiveTab(tab);
+    setActiveDetailReservation(detail);
+    if (!isNavigatingRef.current) {
+      window.history.pushState({ tab, hasDetail: Boolean(detail) }, '', '');
+    }
+  }, []);
+
+  // 브라우저 뒤로 가기 / 앞으로 가기 (popstate) 핸들러
+  useEffect(() => {
+    if (!currentUser) return;
+
+    window.history.replaceState({ tab: activeTab, hasDetail: Boolean(activeDetailReservation) }, '', '');
+
+    const handlePopState = (event: PopStateEvent) => {
+      isNavigatingRef.current = true;
+      if (activeDetailReservation) {
+        setActiveDetailReservation(null);
+      } else if (event.state && event.state.tab) {
+        setActiveTab(event.state.tab);
+      } else {
+        setActiveTab('INDICATOR');
+        window.history.pushState({ tab: 'INDICATOR', hasDetail: false }, '', '');
+      }
+      setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 50);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentUser, activeDetailReservation, activeTab]);
 
   const handleLogin = async (e: SubmitEvent) => {
     e.preventDefault();
@@ -51,7 +87,7 @@ export default function App() {
       localStorage.setItem('hotel_pms_token', data.token);
       localStorage.setItem('hotel_pms_user', JSON.stringify(data));
       setCurrentUser(data);
-      setActiveTab('INDICATOR');
+      navigateTo('INDICATOR', null);
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosErr = err as { response?: { data?: { message?: string } } };
@@ -192,10 +228,7 @@ export default function App() {
         <Sidebar
             currentUser={currentUser}
             activeTab={activeTab}
-            onSelectTab={(tab) => {
-              setActiveTab(tab);
-              setActiveDetailReservation(null);
-            }}
+            onSelectTab={(tab) => navigateTo(tab, null)}
             onLogout={handleLogout}
         />
 
@@ -252,27 +285,100 @@ export default function App() {
                         )}
 
                         {indicatorData && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                              {Object.entries(indicatorData.floorRooms).sort(([a], [b]) => Number(b) - Number(a)).map(([floor, rooms]) => (
-                                  <div key={floor} style={{ backgroundColor: '#1e293b', padding: '1rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                                    <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', color: '#94a3b8' }}>{floor}F ({rooms.length}실)</h3>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '8px' }}>
-                                      {rooms.map((room) => {
-                                        const c = getStatusColor(room.status);
-                                        return (
-                                            <div key={room.roomNumber} style={{ padding: '0.6rem', borderRadius: '6px', border: `1px solid ${c.borderColor}`, backgroundColor: c.backgroundColor, minHeight: '75px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                <span style={{ fontWeight: 700, fontSize: '1rem' }}>{room.roomNumber}</span>
-                                                <span style={{ fontSize: '0.6rem', padding: '2px 4px', borderRadius: '4px', backgroundColor: '#0f172a', color: c.badge }}>{room.status}</span>
-                                              </div>
-                                              <div style={{ fontSize: '0.7rem', color: '#cbd5e1' }}>{room.roomTypeName}</div>
-                                              <div style={{ fontSize: '0.7rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room.guestName || '-'}</div>
-                                            </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                              ))}
+                            <div style={{ backgroundColor: '#1e293b', padding: '1.5rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '10px', overflowX: 'auto' }}>
+                              {Object.entries(indicatorData.floorRooms)
+                                  .sort(([a], [b]) => Number(b) - Number(a))
+                                  .map(([floorStr, rooms]) => {
+                                    const floor = Number(floorStr);
+                                    const prefix = floor < 10 ? `0${floor}` : `${floor}`;
+                                    const roomMap = new Map(rooms.map((r) => [r.roomNumber, r]));
+
+                                    return (
+                                        <div key={floor} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                          {/* 좌측 층수 뱃지 */}
+                                          <div style={{
+                                            width: '52px', minWidth: '52px', height: '68px', backgroundColor: '#0f172a', color: '#38bdf8',
+                                            border: '1px solid #334155', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: '0.85rem', fontWeight: 800
+                                          }}>
+                                            {floor}F
+                                          </div>
+
+                                          {/* 1~16호 실제 건축 도면 16열 고정 그리드 */}
+                                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(16, 76px)', gap: '6px' }}>
+                                            {Array.from({ length: 16 }, (_, rIdx) => rIdx + 1).map((r) => {
+                                              const padRoom = r < 10 ? `0${r}` : `${r}`;
+                                              const roomNo = `${prefix}${padRoom}`;
+
+                                              // 1. 전 층 13호 결번
+                                              if (r === 13) {
+                                                return (
+                                                    <div
+                                                        key={r}
+                                                        title="13호 결번"
+                                                        style={{
+                                                          width: '76px', height: '68px', borderRadius: '6px', border: '1px dashed #334155',
+                                                          backgroundColor: 'rgba(15, 23, 42, 0.4)', display: 'flex', flexDirection: 'column',
+                                                          alignItems: 'center', justifyContent: 'center', color: '#475569', fontSize: '0.75rem', boxSizing: 'border-box'
+                                                        }}
+                                                    >
+                                                      <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>-</span>
+                                                      <span style={{ fontSize: '0.65rem' }}>결번</span>
+                                                    </div>
+                                                );
+                                              }
+
+                                              // 2. 14~15층 03호, 07호 설비/공조실 결번
+                                              if (floor >= 14 && (r === 3 || r === 7)) {
+                                                return (
+                                                    <div
+                                                        key={r}
+                                                        title="설비/공조실 결번"
+                                                        style={{
+                                                          width: '76px', height: '68px', borderRadius: '6px', border: '1px dashed #475569',
+                                                          backgroundColor: 'rgba(30, 41, 59, 0.4)', display: 'flex', flexDirection: 'column',
+                                                          alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.7rem', boxSizing: 'border-box'
+                                                        }}
+                                                    >
+                                                      <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{padRoom}</span>
+                                                      <span style={{ fontSize: '0.65rem' }}>설비실</span>
+                                                    </div>
+                                                );
+                                              }
+
+                                              const room = roomMap.get(roomNo);
+                                              if (!room) return <div key={roomNo} style={{ width: '76px', height: '68px' }} />;
+
+                                              const c = getStatusColor(room.status);
+
+                                              return (
+                                                  <div
+                                                      key={room.roomNumber}
+                                                      style={{
+                                                        width: '76px', height: '68px', padding: '5px 6px', borderRadius: '6px',
+                                                        border: `1px solid ${c.borderColor}`, backgroundColor: c.backgroundColor,
+                                                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxSizing: 'border-box'
+                                                      }}
+                                                  >
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                      <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{room.roomNumber}</span>
+                                                      <span style={{ fontSize: '0.55rem', padding: '1px 3px', borderRadius: '3px', backgroundColor: '#0f172a', color: c.badge }}>
+                                                        {room.status === 'OCCUPIED' ? '재실' : room.status === 'ASSIGNED' ? '배정' : room.status === 'VACANT' ? '공실' : room.status}
+                                                      </span>
+                                                    </div>
+                                                    <div style={{ fontSize: '0.62rem', color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                      {room.roomTypeName}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.62rem', color: room.guestName ? '#38bdf8' : '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: room.guestName ? 600 : 400 }}>
+                                                      {room.guestName || '-'}
+                                                    </div>
+                                                  </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                    );
+                                  })}
                             </div>
                         )}
                       </div>
@@ -469,7 +575,7 @@ export default function App() {
                                     </div>
                                     <div>
                                       <button
-                                          onClick={() => setActiveDetailReservation(res)}
+                                          onClick={() => navigateTo(activeTab, res)}
                                           style={{ padding: '0.5rem 1rem', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}
                                       >
                                         <Settings size={16} /> 상세 / 변경 관리
@@ -510,7 +616,7 @@ export default function App() {
                           </p>
                         </div>
 
-                        {/* 🧪 [신규] 테스트 케이스 커스텀 요구사항 인입 콘솔 */}
+                        {/* 🧪 테스트 케이스 커스텀 요구사항 인입 콘솔 */}
                         <div style={{ backgroundColor: '#1e293b', padding: '1.8rem', borderRadius: '10px', border: '1px solid #334155' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', marginBottom: '0.5rem' }}>
                             <ListChecks size={22} />
