@@ -7,7 +7,7 @@ import Sidebar, { type TabType } from './components/Sidebar';
 import ReservationDetailView from './components/ReservationDetailView';
 import TagManagementView from './components/TagManagementView';
 import {
-  LogIn, RefreshCw, Hotel, Sparkles, Search, Settings, Clock
+  LogIn, RefreshCw, Hotel, Sparkles, Search, Settings, Clock, Plus, Trash2, ListChecks
 } from 'lucide-react';
 
 export default function App() {
@@ -35,6 +35,14 @@ export default function App() {
 
   const [activeDetailReservation, setActiveDetailReservation] = useState<ReservationDetailDto | null>(null);
 
+  // 🧪 [신규] 테스트 케이스 커스텀 요구사항 목록 상태
+  const [customRequirementInput, setCustomRequirementInput] = useState('');
+  const [customRequirements, setCustomRequirements] = useState<string[]>([
+    '오션뷰나 바다 전망이 보이는 방으로 주세요.',
+    '휠체어 이용 예정입니다. 배리어프리 방 필수입니다.',
+    '고층에 엘리베이터에서 멀리 떨어진 조용한 방 희망',
+  ]);
+
   const handleLogin = async (e: SubmitEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -60,7 +68,6 @@ export default function App() {
     setActiveDetailReservation(null);
   }, []);
 
-  // client.ts의 401 이벤트 수신 시 안전하게 로그인 화면으로 복귀
   useEffect(() => {
     const handleUnauthorized = () => {
       handleLogout();
@@ -82,7 +89,6 @@ export default function App() {
     }
   }, [currentUser, businessDate]);
 
-  // 실시간 검색 수행
   const executeSearch = useCallback(async (
       gName = searchGuestName,
       rId = searchReservationId,
@@ -131,6 +137,16 @@ export default function App() {
       void fetchIndicator();
     }
   }, [currentUser, activeTab, fetchIndicator]);
+
+  const addCustomRequirement = () => {
+    if (!customRequirementInput.trim()) return;
+    setCustomRequirements((prev) => [...prev, customRequirementInput.trim()]);
+    setCustomRequirementInput('');
+  };
+
+  const removeCustomRequirement = (index: number) => {
+    setCustomRequirements((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const getStatusColor = (status: RoomMatrixItemDto['status']) => {
     switch (status) {
@@ -481,19 +497,91 @@ export default function App() {
                       </div>
                   )}
 
-                  {/* 태그 사전 관리 탭 추가 */}
                   {activeTab === 'TAGS' && <TagManagementView />}
 
                   {activeTab === 'SIMULATION' && (
-                      <div style={{ maxWidth: '800px', backgroundColor: '#1e293b', padding: '2rem', borderRadius: '10px', border: '1px solid #334155' }}>
-                        <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>🧪 OTA & 채널 매니저(CMS) 연동 테스트 랩</h2>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '1.5rem' }}>
+                      <div style={{ maxWidth: '900px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        <div style={{ backgroundColor: '#1e293b', padding: '2rem', borderRadius: '10px', border: '1px solid #334155' }}>
+                          <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>
+                            🧪 OTA & 채널 매니저(CMS) 연동 테스트 랩
+                          </h2>
+                          <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
+                            가상 채널 인입 전문과 대량 예약 생성 시나리오를 실행하여 배정 로직과 Gemini 태그 파싱을 검증합니다.
+                          </p>
+                        </div>
+
+                        {/* 🧪 [신규] 테스트 케이스 커스텀 요구사항 인입 콘솔 */}
+                        <div style={{ backgroundColor: '#1e293b', padding: '1.8rem', borderRadius: '10px', border: '1px solid #334155' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', marginBottom: '0.5rem' }}>
+                            <ListChecks size={22} />
+                            <h3 style={{ margin: 0, fontSize: '1.15rem' }}>테스트 케이스 요구사항 인입 콘솔 (50건 순환 주입 풀)</h3>
+                          </div>
+                          <p style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5, marginBottom: '1.2rem' }}>
+                            테스트하고 싶은 고객 요청사항(특정 태그 유도 문구 등)을 아래에 추가하세요.
+                            <br />
+                            <b>[기본 6건 + 사용자 정의 {customRequirements.length}건 = 총 {6 + customRequirements.length}건]</b>의 풀이 구성되며,
+                            신규 50건을 생성할 때 이 풀을 순환하여 50건 전체에 빈틈없이 반복 채워집니다.
+                          </p>
+
+                          {/* 입력 필드 */}
+                          <div style={{ display: 'flex', gap: '8px', marginBottom: '1.2rem' }}>
+                            <input
+                                type="text"
+                                placeholder="예: 결혼기념일이라 도쿄타워가 보이는 최고층 방 희망합니다."
+                                value={customRequirementInput}
+                                onChange={(e) => setCustomRequirementInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    addCustomRequirement();
+                                  }
+                                }}
+                                style={{ flex: 1, padding: '0.7rem', borderRadius: '6px', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#fff' }}
+                            />
+                            <button
+                                type="button"
+                                onClick={addCustomRequirement}
+                                style={{ padding: '0.7rem 1.2rem', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            >
+                              <Plus size={16} /> 추가
+                            </button>
+                          </div>
+
+                          {/* 등록된 커스텀 요구사항 목록 */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto', backgroundColor: '#0f172a', padding: '0.8rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                            {customRequirements.length === 0 ? (
+                                <div style={{ color: '#64748b', fontSize: '0.8rem', textAlign: 'center', padding: '1rem' }}>
+                                  사용자 추가 요구사항이 없습니다. (기본 6개 메모만 50건에 순환 반복됩니다)
+                                </div>
+                            ) : (
+                                customRequirements.map((reqText, idx) => (
+                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1e293b', padding: '0.5rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem' }}>
+                                      <span style={{ color: '#cbd5e1' }}>
+                                        <b style={{ color: '#38bdf8', marginRight: '6px' }}>#{idx + 1}</b>
+                                        {reqText}
+                                      </span>
+                                      <button
+                                          type="button"
+                                          onClick={() => removeCustomRequirement(idx)}
+                                          style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px' }}
+                                          title="삭제"
+                                      >
+                                        <Trash2 size={15} />
+                                      </button>
+                                    </div>
+                                ))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 시나리오 실행 버튼들 */}
+                        <div style={{ backgroundColor: '#1e293b', padding: '1.8rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', backgroundColor: '#0f172a', borderRadius: '8px', border: '1px solid #334155' }}>
                             <div>
                               <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#38bdf8' }}>1. 기본 시나리오 샘플 데이터 세팅</h4>
                               <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                          영업일자({businessDate}) 기준 [배정완료 1건, 재실 1건(Sato Yuki, 0302호), 미배정 3건] 주입
-                        </span>
+                                영업일자({businessDate}) 기준 [배정완료 1건, 재실 1건(Sato Yuki, 0302호), 미배정 3건] 주입
+                              </span>
                             </div>
                             <button
                                 onClick={async () => {
@@ -510,14 +598,16 @@ export default function App() {
 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', backgroundColor: '#0f172a', borderRadius: '8px', border: '1px solid #334155' }}>
                             <div>
-                              <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#c084fc' }}>2. 신규 예약 50건 + 재실 고객 30건 대량 인입</h4>
+                              <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#c084fc' }}>
+                                2. 신규 예약 50건 (요구사항 순환 주입) + 재실 30건 대량 인입
+                              </h4>
                               <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                          재실 투숙객 30명을 실물 룸 랙에 미리 점유시키고, AI가 분석할 신규 예약 50건을 한 번에 적재합니다.
-                        </span>
+                                위에서 정의한 {6 + customRequirements.length}개 요구사항 풀을 순환하여 50건의 예약 메모를 생성하고 적재합니다.
+                              </span>
                             </div>
                             <button
                                 onClick={async () => {
-                                  const res: any = await pmsService.bulkSimulate50And30();
+                                  const res: any = await pmsService.bulkSimulate50And30(customRequirements);
                                   alert(res.message || '대량 데이터 인입 완료!');
                                   void fetchIndicator();
                                   void executeSearch();

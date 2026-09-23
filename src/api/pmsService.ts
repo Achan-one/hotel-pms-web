@@ -158,8 +158,10 @@ export const pmsService = {
     return pmsService.simulateLincoln();
   },
 
-  bulkSimulate50And30: async () => {
-    const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/bulk-simulate-50-and-30');
+  bulkSimulate50And30: async (customNotes?: string[]) => {
+    const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/bulk-simulate-50-and-30', {
+      customNotes: customNotes || [],
+    });
     return res.data;
   },
 
