@@ -154,7 +154,8 @@ export default function TagManagementView() {
     }
 
     try {
-      const res = await apiClient.delete(`/api/admin/tags/${tag.code}`);
+      const encodedCode = encodeURIComponent(tag.code.trim());
+      const res = await apiClient.delete(`/api/admin/tags/${encodedCode}`);
       alert(res.data?.message || `[${tag.name}] 태그가 삭제되었습니다.`);
       await fetchTags();
     } catch (err: any) {
