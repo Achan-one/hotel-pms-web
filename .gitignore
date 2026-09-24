@@ -7,12 +7,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# Editor & OS files
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -22,6 +23,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+Thumbs.db
 
-#환경 변수 무시
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# 환경 변수 전체 차단 (.env, .env.local, .env.development 등)
 .env
+.env.*
+!.env.example
