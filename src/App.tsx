@@ -8,6 +8,7 @@ import ReservationDetailView from './components/ReservationDetailView';
 import ReservationGridView from './components/ReservationGridView';
 import TagManagementView from './components/TagManagementView';
 import ExportReportView from './components/ExportReportView';
+import StaffManagementView from './components/StaffManagementView';
 import {
   LogIn, RefreshCw, Hotel, Sparkles, Clock, Plus, Trash2, ListChecks, CheckCircle2, AlertCircle
 } from 'lucide-react';
@@ -30,11 +31,9 @@ export default function App() {
 
   const [activeDetailReservation, setActiveDetailReservation] = useState<ReservationDetailDto | null>(null);
 
-  // 🔮 AI 일괄 배정 백그라운드 태스크 및 결과 알림 상태
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignToast, setAssignToast] = useState<{ message: string; isError?: boolean } | null>(null);
 
-  // 🧪 테스트 케이스 커스텀 요구사항 목록
   const [customRequirementInput, setCustomRequirementInput] = useState('');
   const [customRequirements, setCustomRequirements] = useState<string[]>([
     '오션뷰나 바다 전망이 보이는 방으로 주세요.',
@@ -53,7 +52,6 @@ export default function App() {
     }
   }, []);
 
-  // 뒤로 가기 / 앞으로 가기 핸들러
   useEffect(() => {
     if (!currentUser) return;
 
@@ -130,7 +128,6 @@ export default function App() {
     }
   }, [currentUser, activeTab, fetchIndicator]);
 
-  // 🔮 논블로킹 비동기 일괄 배정 핸들러
   const handleBatchAssign = async () => {
     if (!confirm(`${businessDate} 일자의 미배정 예약을 규칙 기반으로 일괄 자동 배정하시겠습니까?`)) return;
 
@@ -277,7 +274,7 @@ export default function App() {
             />
           ) : (
             <>
-              {/* 1. 191실 룸 인디케이터 탭 (16열 균등 고정 minmax(0, 1fr) 적용) */}
+              {/* 1. 191실 룸 인디케이터 탭 */}
               {activeTab === 'INDICATOR' && (
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, width: '100%', gap: '0.6rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
@@ -336,7 +333,6 @@ export default function App() {
                                 {floor}F
                               </div>
 
-                              {/* 16열 고정 minmax(0, 1fr) */}
                               <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(16, minmax(0, 1fr))', gap: '5px' }}>
                                 {Array.from({ length: 16 }, (_, rIdx) => rIdx + 1).map((r) => {
                                   const padRoom = r < 10 ? `0${r}` : `${r}`;
@@ -394,7 +390,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 2. 📊 분리된 정밀 데이터 그리드 탭 (신규 분리 컴포넌트 호출) */}
+              {/* 2. 예약 그리드 탭 */}
               {activeTab === 'RESERVATIONS' && (
                 <ReservationGridView
                   businessDate={businessDate}
@@ -431,10 +427,13 @@ export default function App() {
               {/* 4. 태그 사전 관리 탭 */}
               {activeTab === 'TAGS' && <TagManagementView />}
 
-              {/* 5. 📥 신규 데이터 엑스포트(CSV) 탭 */}
+              {/* 5. 신규 직원 계정 발급 탭 (ROLE_ADMIN 총지배인 전용) */}
+              {activeTab === 'STAFF_MGMT' && <StaffManagementView />}
+
+              {/* 6. 데이터 엑스포트(CSV) 탭 */}
               {activeTab === 'EXPORT' && <ExportReportView businessDate={businessDate} />}
 
-              {/* 6. OTA/린칸 테스트 랩 탭 */}
+              {/* 7. OTA/린칸 테스트 랩 탭 */}
               {activeTab === 'SIMULATION' && (
                 <div style={{ maxWidth: '900px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   <div style={{ backgroundColor: '#131d36', padding: '2rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>

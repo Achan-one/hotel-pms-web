@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { ApiResponse, FloorMapResponseDto, LoginResponse } from '../types/pms';
+import type { ApiResponse, FloorMapResponseDto, LoginResponse, StaffRole } from '../types/pms';
 
 export interface TagPreferenceDto {
   preferredTags: string[];
@@ -43,7 +43,6 @@ export interface ReservationDetailDto {
   };
 }
 
-// 구버전/신버전 타입 호환용 별칭
 export type ReservationDto = ReservationDetailDto;
 
 export interface ReservationSearchParams {
@@ -55,7 +54,13 @@ export interface ReservationSearchParams {
   tag?: string;
 }
 
-// 📥 브라우저 파일 다운로드 트리거 헬퍼 함수
+export interface CreateStaffRequest {
+  staffId: string;
+  password: string;
+  name: string;
+  role: StaffRole;
+}
+
 function triggerFileDownload(blobData: BlobPart, fileName: string) {
   const blob = new Blob([blobData], { type: 'text/csv;charset=utf-8;' });
   const url = window.URL.createObjectURL(blob);
@@ -76,6 +81,12 @@ export const pmsService = {
       password,
     });
     return res.data.data;
+  },
+
+  // 관리자 전용 직원 계정 발급 (ROLE_ADMIN 전용)
+  createStaff: async (data: CreateStaffRequest) => {
+    const res = await apiClient.post<ApiResponse<void>>('/api/admin/staff', data);
+    return res.data;
   },
 
   // 룸 인디케이터
@@ -191,13 +202,6 @@ export const pmsService = {
     return res.data;
   },
 
-  // =========================================================================
-  // 실무 보고서 CSV 엑스포트 메서드 3종
-  // =========================================================================
-
-  /**
-   * 1. 숙박자(In-House) 리스트 CSV 다운로드
-   */
   downloadInHouseCsv: async (targetDate: string) => {
     const res = await apiClient.get('/api/reports/in-house/csv', {
       params: { targetDate },
@@ -206,9 +210,6 @@ export const pmsService = {
     triggerFileDownload(res.data, `숙박자리스트_${targetDate}.csv`);
   },
 
-  /**
-   * 2. 예약자(Bookings) 리스트 CSV 다운로드
-   */
   downloadReservationsCsv: async (startDate: string, status?: string) => {
     const res = await apiClient.get('/api/reports/reservations/csv', {
       params: { startDate, status: status || undefined },
@@ -217,9 +218,6 @@ export const pmsService = {
     triggerFileDownload(res.data, `예약자리스트_${startDate}.csv`);
   },
 
-  /**
-   * 3. 태그 & 스페셜 리퀘스트 리스트 CSV 다운로드
-   */
   downloadSpecialRequestsCsv: async (targetDate: string) => {
     const res = await apiClient.get('/api/reports/special-requests/csv', {
       params: { targetDate },
@@ -227,7 +225,7 @@ export const pmsService = {
     });
     triggerFileDownload(res.data, `태그_요청사항리스트_${targetDate}.csv`);
   },
-  // 4. 191실 객실별 보유 태그 인벤토리 CSV
+
   downloadRoomTagsCsv: async () => {
     const res = await apiClient.get('/api/reports/room-tags/csv', {
       responseType: 'blob',
@@ -235,7 +233,6 @@ export const pmsService = {
     triggerFileDownload(res.data, '191실_객실별_보유태그인벤토리.csv');
   },
 
-  // 5. 태그 기준 객실 매핑 매트릭스 CSV
   downloadTagMatrixCsv: async () => {
     const res = await apiClient.get('/api/reports/tag-matrix/csv', {
       responseType: 'blob',

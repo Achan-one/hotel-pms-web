@@ -1,9 +1,9 @@
 import type { LoginResponse } from '../types/pms';
 import {
-    Hotel, Grid, Search, Sparkles, LogOut, UserCheck, Beaker, Tag, FileDown
+    Hotel, Grid, Search, Sparkles, LogOut, UserCheck, Beaker, Tag, FileDown, UserPlus
 } from 'lucide-react';
 
-export type TabType = 'INDICATOR' | 'RESERVATIONS' | 'BATCH_ASSIGN' | 'TAGS' | 'EXPORT' | 'SIMULATION';
+export type TabType = 'INDICATOR' | 'RESERVATIONS' | 'BATCH_ASSIGN' | 'TAGS' | 'STAFF_MGMT' | 'EXPORT' | 'SIMULATION';
 
 interface SidebarProps {
     currentUser: LoginResponse;
@@ -13,11 +13,12 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout }: SidebarProps) {
-    const menuItems: { id: TabType; label: string; icon: typeof Grid }[] = [
+    const menuItems: { id: TabType; label: string; icon: typeof Grid; adminOnly?: boolean }[] = [
         { id: 'INDICATOR', label: '191실 룸 인디케이터', icon: Grid },
         { id: 'RESERVATIONS', label: '예약 검색 & 통합 관리', icon: Search },
         { id: 'BATCH_ASSIGN', label: 'AI 당일 일괄 배정', icon: Sparkles },
         { id: 'TAGS', label: '태그 사전 관리 (Admin)', icon: Tag },
+        { id: 'STAFF_MGMT', label: '직원 계정 발급 (Admin)', icon: UserPlus, adminOnly: true },
         { id: 'EXPORT', label: '데이터 엑스포트 (CSV)', icon: FileDown },
         { id: 'SIMULATION', label: 'OTA/린칸 테스트 랩', icon: Beaker },
     ];
@@ -38,26 +39,28 @@ export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout 
                 </div>
 
                 <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {menuItems.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = activeTab === item.id;
-                        return (
-                            <button
-                                key={item.id}
-                                onClick={() => onSelectTab(item.id)}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
-                                    padding: '0.8rem 1rem', borderRadius: '8px', border: 'none',
-                                    backgroundColor: isActive ? (item.id === 'SIMULATION' ? '#e11d48' : '#0284c7') : 'transparent',
-                                    color: isActive ? '#ffffff' : '#94a3b8', fontWeight: isActive ? 700 : 500,
-                                    fontSize: '0.9rem', cursor: 'pointer', textAlign: 'left'
-                                }}
-                            >
-                                <Icon size={18} color={isActive ? '#ffffff' : '#94a3b8'} />
-                                {item.label}
-                            </button>
-                        );
-                    })}
+                    {menuItems
+                        .filter(item => !item.adminOnly || currentUser.role === 'ROLE_ADMIN')
+                        .map((item) => {
+                            const Icon = item.icon;
+                            const isActive = activeTab === item.id;
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={() => onSelectTab(item.id)}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
+                                        padding: '0.8rem 1rem', borderRadius: '8px', border: 'none',
+                                        backgroundColor: isActive ? (item.id === 'SIMULATION' ? '#e11d48' : '#0284c7') : 'transparent',
+                                        color: isActive ? '#ffffff' : '#94a3b8', fontWeight: isActive ? 700 : 500,
+                                        fontSize: '0.9rem', cursor: 'pointer', textAlign: 'left'
+                                    }}
+                                >
+                                    <Icon size={18} color={isActive ? '#ffffff' : '#94a3b8'} />
+                                    {item.label}
+                                </button>
+                            );
+                        })}
                 </nav>
             </div>
 
