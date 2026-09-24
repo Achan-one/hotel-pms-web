@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ReservationDetailDto } from '../api/pmsService';
 import { pmsService } from '../api/pmsService';
 import apiClient from '../api/client';
 import {
-  Search, Settings, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Tag as TagIcon, X
+  Search, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Tag as TagIcon, X
 } from 'lucide-react';
 
 interface Props {
