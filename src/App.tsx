@@ -10,7 +10,7 @@ import TagManagementView from './components/TagManagementView';
 import ExportReportView from './components/ExportReportView';
 import StaffManagementView from './components/StaffManagementView';
 import {
-  LogIn, RefreshCw, Hotel, Sparkles, Clock, Plus, Trash2, ListChecks, CheckCircle2, AlertCircle
+  LogIn, RefreshCw, Hotel, Sparkles, Clock, Plus, Trash2, ListChecks, CheckCircle2, AlertCircle, Moon, Dices
 } from 'lucide-react';
 
 export default function App() {
@@ -24,6 +24,7 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
+  // 1. 공식 영업일자 State (서버 DB와 실시간 동기화)
   const [businessDate, setBusinessDate] = useState('2026-09-20');
 
   const [indicatorData, setIndicatorData] = useState<FloorMapResponseDto | null>(null);
@@ -32,6 +33,7 @@ export default function App() {
   const [activeDetailReservation, setActiveDetailReservation] = useState<ReservationDetailDto | null>(null);
 
   const [isAssigning, setIsAssigning] = useState(false);
+  const [isNightAuditing, setIsNightAuditing] = useState(false);
   const [assignToast, setAssignToast] = useState<{ message: string; isError?: boolean } | null>(null);
 
   const [customRequirementInput, setCustomRequirementInput] = useState('');
@@ -109,6 +111,16 @@ export default function App() {
     return () => window.removeEventListener('auth-unauthorized', handleUnauthorized);
   }, [handleLogout]);
 
+  // 2. 로그인 시 서버 DB의 공식 영업일자 조회하여 단일 진실 공급원 동기화
+  useEffect(() => {
+    if (!currentUser) return;
+    pmsService.getSystemBusinessDate()
+      .then((serverDate) => {
+        if (serverDate) setBusinessDate(serverDate);
+      })
+      .catch((err) => console.error('시스템 영업일자 조회 실패:', err));
+  }, [currentUser]);
+
   const fetchIndicator = useCallback(async () => {
     if (!currentUser) return;
     setIndicatorLoading(true);
@@ -127,6 +139,16 @@ export default function App() {
       void fetchIndicator();
     }
   }, [currentUser, activeTab, fetchIndicator]);
+
+  // 3. 헤더 인풋에서 영업일자를 변경할 때 서버 DB에도 즉시 동기화
+  const handleBusinessDateChange = async (newDate: string) => {
+    setBusinessDate(newDate);
+    try {
+      await pmsService.setSystemBusinessDate(newDate);
+    } catch (err) {
+      console.error('영업일자 서버 DB 동기화 실패:', err);
+    }
+  };
 
   const handleBatchAssign = async () => {
     if (!confirm(`${businessDate} 일자의 미배정 예약을 규칙 기반으로 일괄 자동 배정하시겠습니까?`)) return;
@@ -157,6 +179,35 @@ export default function App() {
     }
   };
 
+  // 4. 나이트 오딧 실행 핸들러 (서버 DB가 이미 익일 롤오버 처리함)
+  const handleRunNightAudit = async () => {
+    if (!confirm(`[주의] ${businessDate} 기준 나이트 오딧을 실행하시겠습니까?\n\n1. 미체크인 당일 도착건: 노쇼 취소 및 방 반납\n2. 재실 고객: 1박 객실료 자동 청구\n3. 영업일자: 익일로 자동 변경`)) return;
+
+    setIsNightAuditing(true);
+    try {
+      const res = await pmsService.runNightAudit(businessDate);
+      const audit = res.data;
+      alert(`🌙 [나이트 오딧 마감 완료]\n- 노쇼 취소: ${audit.noShowCount}건\n- 룸차지 포스팅: ${audit.roomChargePostedCount}실 (총 ¥${audit.totalRoomRevenuePosted.toLocaleString()})\n- 신규 영업일자: ${audit.newBusinessDate}`);
+      setBusinessDate(audit.newBusinessDate);
+      void fetchIndicator();
+    } catch (err: any) {
+      alert('나이트 오딧 실패: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsNightAuditing(false);
+    }
+  };
+
+  const handleGenerateDynamic50 = async () => {
+    if (!confirm(`현재 선택된 영업일자(${businessDate})를 기준으로 50명의 고유 실명 및 OTA(Agoda, Booking 등) 예약을 생성하시겠습니까?`)) return;
+    try {
+      const res = await pmsService.generateDynamicTestData(businessDate);
+      alert(res.message || `${businessDate} 기준 50인 예약 생성 완료!`);
+      void fetchIndicator();
+    } catch (err: any) {
+      alert('데이터 생성 실패: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
   const addCustomRequirement = () => {
     if (!customRequirementInput.trim()) return;
     setCustomRequirements((prev) => [...prev, customRequirementInput.trim()]);
@@ -167,38 +218,59 @@ export default function App() {
     setCustomRequirements((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const getStatusColor = (status: RoomMatrixItemDto['status']) => {
+  const getStatusClass = (status: RoomMatrixItemDto['status']) => {
     switch (status) {
-      case 'OCCUPIED': return { backgroundColor: '#450a0a', borderColor: '#ef4444', text: '#fca5a5' };
-      case 'ASSIGNED': return { backgroundColor: '#172554', borderColor: '#3b82f6', text: '#93c5fd' };
-      case 'OUT': return { backgroundColor: '#451a03', borderColor: '#f59e0b', text: '#fcd34d' };
-      case 'CLEANING': return { backgroundColor: '#083344', borderColor: '#06b6d4', text: '#67e8f9' };
-      case 'BREAK': return { backgroundColor: '#27272a', borderColor: '#71717a', text: '#d4d4d8' };
-      case 'BLOCKED': return { backgroundColor: '#3b0764', borderColor: '#a855f7', text: '#d8b4fe' };
+      case 'OCCUPIED': return 'bg-[#450a0a] border-red-500 text-red-300';
+      case 'ASSIGNED': return 'bg-[#172554] border-blue-500 text-blue-300';
+      case 'OUT': return 'bg-[#451a03] border-amber-500 text-amber-300';
+      case 'CLEANING': return 'bg-[#083344] border-cyan-500 text-cyan-300';
+      case 'BREAK': return 'bg-zinc-800 border-zinc-500 text-zinc-300';
+      case 'BLOCKED': return 'bg-purple-950 border-purple-500 text-purple-300';
       case 'VACANT':
-      default: return { backgroundColor: '#064e3b', borderColor: '#10b981', text: '#6ee7b7' };
+      default: return 'bg-emerald-950 border-emerald-500 text-emerald-300';
     }
   };
 
   if (!currentUser) {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a' }}>
-        <form onSubmit={handleLogin} style={{ backgroundColor: '#1e293b', padding: '2.5rem', borderRadius: '12px', width: '380px', color: '#f8fafc', boxShadow: '0 8px 30px rgba(0,0,0,0.4)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem' }}>
-            <Hotel size={32} color="#38bdf8" />
-            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>HOTEL PMS</h2>
+      <div className="flex min-h-screen items-center justify-center bg-slate-900">
+        <form onSubmit={handleLogin} className="w-[380px] rounded-xl border border-white/10 bg-slate-800 p-10 text-slate-100 shadow-2xl">
+          <div className="mb-6 flex items-center gap-2.5">
+            <Hotel className="h-8 w-8 text-sky-400" />
+            <h2 className="text-2xl font-bold">HOTEL PMS</h2>
           </div>
-          <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>프론트 데스크 운영 시스템 로그인</p>
-          {loginError && <div style={{ backgroundColor: '#7f1d1d', color: '#fecaca', padding: '0.75rem', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '1rem', border: '1px solid #b91c1c' }}>{loginError}</div>}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.5rem' }}>직원 ID</label>
-            <input type="text" value={staffId} onChange={(e) => setStaffId(e.target.value)} placeholder="예: admin" style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#fff' }} required />
+          <p className="mb-6 text-sm text-slate-400">프론트 데스크 운영 시스템 로그인</p>
+          {loginError && (
+            <div className="mb-4 rounded-md border border-red-700 bg-red-900/60 p-3 text-sm text-red-200">
+              {loginError}
+            </div>
+          )}
+          <div className="mb-4">
+            <label className="mb-2 block text-xs font-semibold text-slate-300">직원 ID</label>
+            <input
+              type="text"
+              value={staffId}
+              onChange={(e) => setStaffId(e.target.value)}
+              placeholder="예: admin"
+              className="w-full rounded-md border border-slate-600 bg-slate-900 p-3 text-sm text-white focus:border-sky-400"
+              required
+            />
           </div>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.5rem' }}>비밀번호</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="hotel1234" style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#fff' }} required />
+          <div className="mb-6">
+            <label className="mb-2 block text-xs font-semibold text-slate-300">비밀번호</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="hotel1234"
+              className="w-full rounded-md border border-slate-600 bg-slate-900 p-3 text-sm text-white focus:border-sky-400"
+              required
+            />
           </div>
-          <button type="submit" style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', backgroundColor: '#0284c7', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <button
+            type="submit"
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 p-3 font-semibold text-white transition hover:bg-sky-500"
+          >
             <LogIn size={18} /> 로그인
           </button>
         </form>
@@ -207,64 +279,71 @@ export default function App() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: '#0b1329', color: '#f1f5f9', overflow: 'hidden', position: 'relative' }}>
+    <div className="relative flex h-screen w-screen overflow-hidden bg-[#0b1329] text-slate-100">
       
       {/* 🔮 우측 상단 플로팅 백그라운드 태스크 위젯 */}
       {(isAssigning || assignToast) && (
-        <div style={{
-          position: 'fixed', top: '12px', right: '24px', zIndex: 9999, display: 'flex', alignItems: 'center', gap: '12px',
-          padding: '0.65rem 1.15rem', borderRadius: '8px',
-          backgroundColor: isAssigning ? '#1e1b4b' : (assignToast?.isError ? '#450a0a' : '#064e3b'),
-          border: `1px solid ${isAssigning ? '#a855f7' : (assignToast?.isError ? '#ef4444' : '#10b981')}`,
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5), 0 0 16px rgba(168, 85, 247, 0.25)',
-          color: '#f8fafc', fontSize: '0.85rem', fontWeight: 600, pointerEvents: 'none'
-        }}>
+        <div className={`pointer-events-none fixed top-3 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-2.5 text-xs font-semibold text-slate-100 shadow-2xl ${
+          isAssigning ? 'border-purple-500 bg-[#1e1b4b]' : assignToast?.isError ? 'border-red-500 bg-[#450a0a]' : 'border-emerald-500 bg-[#064e3b]'
+        }`}>
           {isAssigning ? (
             <>
-              <Sparkles size={18} color="#c084fc" className="spin" />
+              <Sparkles size={18} className="spin text-purple-400" />
               <div>
-                <div style={{ color: '#c084fc', fontWeight: 700, fontSize: '0.85rem' }}>AI 일괄 배정 엔진 연산 중...</div>
-                <div style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>다른 화면으로 이동하셔도 백그라운드에서 완료됩니다</div>
+                <div className="font-bold text-purple-300">AI 일괄 배정 엔진 연산 중...</div>
+                <div className="text-[11px] text-slate-300">다른 화면으로 이동하셔도 백그라운드에서 완료됩니다</div>
               </div>
             </>
           ) : (
             <>
-              {assignToast?.isError ? <AlertCircle size={18} color="#f87171" /> : <CheckCircle2 size={18} color="#34d399" />}
-              <span style={{ fontSize: '0.85rem' }}>{assignToast?.message}</span>
+              {assignToast?.isError ? <AlertCircle size={18} className="text-red-400" /> : <CheckCircle2 size={18} className="text-emerald-400" />}
+              <span>{assignToast?.message}</span>
             </>
           )}
         </div>
       )}
 
       {/* 사이드바 */}
-      <div style={{ flexShrink: 0, width: '260px', height: '100vh' }}>
+      <div className="h-screen w-[260px] shrink-0">
         <Sidebar currentUser={currentUser} activeTab={activeTab} onSelectTab={(tab) => navigateTo(tab, null)} onLogout={handleLogout} />
       </div>
 
       {/* 메인 뷰포트 영역 */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', minWidth: 0, overflow: 'hidden' }}>
-        <header style={{
-          backgroundColor: '#0f172a', borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          padding: '0.75rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Clock size={16} color="#38bdf8" />
-            <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>호텔 시스템 영업일자:</span>
-            <input
-              type="date" value={businessDate} onChange={(e) => setBusinessDate(e.target.value)}
-              style={{ padding: '0.35rem 0.7rem', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.4)', backgroundColor: '#1e293b', color: '#38bdf8', fontWeight: 700, fontSize: '0.9rem', outline: 'none' }}
-            />
+      <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex shrink-0 items-center justify-between border-b border-white/10 bg-slate-900 px-8 py-3">
+          <div className="flex items-center gap-3.5">
+            <div className="flex items-center gap-2">
+              <Clock size={16} className="text-sky-400" />
+              <span className="text-xs font-semibold text-slate-400">호텔 공식 영업일자:</span>
+              <input
+                type="date"
+                value={businessDate}
+                onChange={(e) => void handleBusinessDateChange(e.target.value)}
+                className="rounded-md border border-sky-400/40 bg-slate-800 px-3 py-1 text-sm font-bold text-sky-400 focus:border-sky-400"
+              />
+            </div>
+
+            {/* 🌙 나이트 오딧 실행 버튼 */}
+            <button
+              onClick={handleRunNightAudit}
+              disabled={isNightAuditing}
+              title="야간 일일 마감: 당일 노쇼 자동 취소, 재실 숙박료 정산, 영업일자 익일 롤오버"
+              className={`flex items-center gap-1.5 rounded-md border border-red-600 px-3 py-1.5 text-xs font-bold text-white shadow-md transition ${
+                isNightAuditing ? 'cursor-not-allowed bg-red-900' : 'bg-red-800 hover:bg-red-700'
+              }`}
+            >
+              <Moon size={14} className={isNightAuditing ? 'spin' : ''} />
+              {isNightAuditing ? '마감 정산 중...' : '나이트 오딧 실행'}
+            </button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }} />
-            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>모든 체크인, 룸체인지, 배정의 기준일자</span>
+
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <span className="text-xs font-medium text-slate-500">모든 체크인, 룸체인지, 배정의 기준일자</span>
           </div>
         </header>
 
-        <main style={{
-          flex: 1, padding: '1.25rem 2rem', overflowY: activeTab === 'INDICATOR' ? 'hidden' : 'auto',
-          overflowX: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0
-        }}>
+        <main className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden p-5 px-8 ${activeTab === 'INDICATOR' ? 'overflow-y-hidden' : 'overflow-y-auto'}`}>
           {activeDetailReservation ? (
             <ReservationDetailView
               reservation={activeDetailReservation}
@@ -276,46 +355,38 @@ export default function App() {
             <>
               {/* 1. 191실 룸 인디케이터 탭 */}
               {activeTab === 'INDICATOR' && (
-                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, width: '100%', gap: '0.6rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-                      <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#f8fafc' }}>191실 룸 인디케이터</h2>
-                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>기준 영업일자: {businessDate}</span>
+                <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-2">
+                  <div className="flex shrink-0 items-center justify-between">
+                    <div className="flex items-baseline gap-3">
+                      <h2 className="text-lg font-bold text-slate-100">191실 룸 인디케이터</h2>
+                      <span className="text-xs text-slate-400">기준 영업일자: {businessDate}</span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.75rem' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: '#10b981' }} /> 공실
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: '#3b82f6' }} /> 배정완료
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: '#ef4444' }} /> 재실(투숙중)
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: '#06b6d4' }} /> 청소중
-                      </span>
-                      <button onClick={() => void fetchIndicator()} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.35rem 0.75rem', borderRadius: '6px', backgroundColor: '#0284c7', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                    <div className="flex items-center gap-3.5 text-xs">
+                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs bg-emerald-500" /> 공실</span>
+                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs bg-blue-500" /> 배정완료</span>
+                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs bg-red-500" /> 재실(투숙중)</span>
+                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs bg-cyan-500" /> 청소중</span>
+                      <button
+                        onClick={() => void fetchIndicator()}
+                        className="flex items-center gap-1.5 rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-500"
+                      >
                         <RefreshCw size={14} className={indicatorLoading ? 'spin' : ''} /> 새로고침
                       </button>
                     </div>
                   </div>
 
                   {indicatorData && (
-                    <div style={{ display: 'flex', gap: '1.8rem', fontSize: '0.85rem', backgroundColor: '#131d36', padding: '0.55rem 1.4rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)', flexShrink: 0 }}>
-                      <span>총 객실: <b>{indicatorData.totalRooms}실</b></span>
-                      <span style={{ color: '#f87171' }}>점유: <b>{indicatorData.occupiedRooms}실</b></span>
-                      <span style={{ color: '#34d399' }}>공실: <b>{indicatorData.vacantRooms}실</b></span>
-                      <span style={{ color: '#38bdf8' }}>점유율: <b>{indicatorData.occupancyRatePercent}%</b></span>
+                    <div className="flex shrink-0 gap-7 rounded-lg border border-white/10 bg-[#131d36] px-5 py-2 text-xs">
+                      <span>총 객실: <b className="font-bold">{indicatorData.totalRooms}실</b></span>
+                      <span className="text-red-400">점유: <b className="font-bold">{indicatorData.occupiedRooms}실</b></span>
+                      <span className="text-emerald-400">공실: <b className="font-bold">{indicatorData.vacantRooms}실</b></span>
+                      <span className="text-sky-400">점유율: <b className="font-bold">{indicatorData.occupancyRatePercent}%</b></span>
                     </div>
                   )}
 
                   {indicatorData && (
-                    <div style={{
-                      flex: 1, minHeight: 0, backgroundColor: '#131d36', padding: '0.8rem',
-                      borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '5px'
-                    }}>
+                    <div className="flex min-h-0 flex-1 flex-col gap-1 rounded-xl border border-white/10 bg-[#131d36] p-3">
                       {Object.entries(indicatorData.floorRooms)
                         .sort(([a], [b]) => Number(b) - Number(a))
                         .map(([floorStr, rooms]) => {
@@ -324,23 +395,19 @@ export default function App() {
                           const roomMap = new Map(rooms.map((r) => [r.roomNumber, r]));
 
                           return (
-                            <div key={floor} style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'stretch', gap: '6px' }}>
-                              <div style={{
-                                width: '44px', minWidth: '44px', height: '100%', backgroundColor: '#0b1329', color: '#38bdf8',
-                                border: '1px solid #293548', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '0.78rem', fontWeight: 800, userSelect: 'none'
-                              }}>
+                            <div key={floor} className="flex min-h-0 flex-1 items-stretch gap-1.5">
+                              <div className="flex h-full w-11 min-w-[44px] select-none items-center justify-center rounded border border-[#293548] bg-[#0b1329] text-xs font-extrabold text-sky-400">
                                 {floor}F
                               </div>
 
-                              <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(16, minmax(0, 1fr))', gap: '5px' }}>
+                              <div className="grid flex-1 grid-cols-16 gap-1">
                                 {Array.from({ length: 16 }, (_, rIdx) => rIdx + 1).map((r) => {
                                   const padRoom = r < 10 ? `0${r}` : `${r}`;
                                   const roomNo = `${prefix}${padRoom}`;
 
                                   if (r === 13) {
                                     return (
-                                      <div key={r} title="13호 결번" style={{ height: '100%', borderRadius: '4px', border: '1px dashed #293548', backgroundColor: 'rgba(11, 19, 41, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', fontSize: '0.75rem', userSelect: 'none', minWidth: 0 }}>
+                                      <div key={r} title="13호 결번" className="flex h-full select-none items-center justify-center rounded border border-dashed border-[#293548] bg-[#0b1329]/40 text-xs text-slate-600">
                                         -
                                       </div>
                                     );
@@ -348,33 +415,28 @@ export default function App() {
 
                                   if (floor >= 14 && (r === 3 || r === 7)) {
                                     return (
-                                      <div key={r} title="설비/공조실 결번" style={{ height: '100%', borderRadius: '4px', border: '1px dashed #334155', backgroundColor: 'rgba(19, 29, 54, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.7rem', userSelect: 'none', minWidth: 0 }}>
+                                      <div key={r} title="설비/공조실 결번" className="flex h-full select-none items-center justify-center rounded border border-dashed border-slate-700 bg-[#131d36]/40 text-[11px] text-slate-500">
                                         설비
                                       </div>
                                     );
                                   }
 
                                   const room = roomMap.get(roomNo);
-                                  if (!room) return <div key={roomNo} style={{ height: '100%', minWidth: 0 }} />;
+                                  if (!room) return <div key={roomNo} className="h-full min-w-0" />;
 
-                                  const c = getStatusColor(room.status);
                                   const tooltipText = `[${room.roomNumber}호] ${room.roomTypeName}\n상태: ${room.status}${room.guestName ? `\n투숙객: ${room.guestName}` : ''}`;
 
                                   return (
                                     <div
                                       key={room.roomNumber}
                                       title={tooltipText}
-                                      style={{
-                                        height: '100%', borderRadius: '4px', border: `1px solid ${c.borderColor}`, backgroundColor: c.backgroundColor,
-                                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                                        userSelect: 'none', padding: '2px 4px', boxSizing: 'border-box', minWidth: 0, overflow: 'hidden'
-                                      }}
+                                      className={`flex h-full min-w-0 select-none flex-col items-center justify-center rounded border px-1 py-0.5 leading-tight ${getStatusClass(room.status)}`}
                                     >
-                                      <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#ffffff', letterSpacing: '-0.3px', lineHeight: 1.1 }}>
+                                      <span className="text-xs font-extrabold tracking-tight text-white">
                                         {room.roomNumber}
                                       </span>
                                       {room.guestName && (
-                                        <span style={{ fontSize: '0.62rem', color: c.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', lineHeight: 1.1, marginTop: '2px', display: 'block' }}>
+                                        <span className="mt-0.5 block max-w-full truncate text-[10px] opacity-90">
                                           {room.guestName}
                                         </span>
                                       )}
@@ -400,23 +462,20 @@ export default function App() {
 
               {/* 3. 규칙 기반 AI 일괄 배정 탭 */}
               {activeTab === 'BATCH_ASSIGN' && (
-                <div style={{ maxWidth: '600px', backgroundColor: '#131d36', padding: '2rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
-                    <Sparkles size={28} color="#c084fc" />
-                    <h2 style={{ margin: 0, fontSize: '1.3rem', color: '#f8fafc' }}>규칙 기반 AI 일괄 배정</h2>
+                <div className="max-w-[600px] rounded-xl border border-white/10 bg-[#131d36] p-8">
+                  <div className="mb-4 flex items-center gap-2.5">
+                    <Sparkles className="h-7 w-7 text-purple-400" />
+                    <h2 className="text-xl font-bold text-slate-100">규칙 기반 AI 일괄 배정</h2>
                   </div>
-                  <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+                  <p className="mb-6 text-sm leading-relaxed text-slate-400">
                     호텔 공식 영업일자({businessDate}) 기준 미배정 예약 전체를 대상으로 선호도 및 연박 보호 규칙을 계산하여 빈 객실을 일괄 자동 배정합니다.
                   </p>
                   <button
                     onClick={handleBatchAssign}
                     disabled={isAssigning}
-                    style={{
-                      width: '100%', padding: '0.85rem', borderRadius: '6px',
-                      backgroundColor: isAssigning ? '#4c1d95' : '#7c3aed',
-                      color: '#fff', border: 'none', fontWeight: 700, cursor: isAssigning ? 'not-allowed' : 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-                    }}
+                    className={`flex w-full items-center justify-center gap-2 rounded-md p-3.5 font-bold text-white transition ${
+                      isAssigning ? 'cursor-not-allowed bg-purple-900' : 'bg-purple-600 hover:bg-purple-500'
+                    }`}
                   >
                     <Sparkles size={18} className={isAssigning ? 'spin' : ''} />
                     {isAssigning ? 'Gemini 2.5 Flash 일괄 분석 & 배정 진행 중...' : `${businessDate} 미배정 예약 일괄 배정 실행`}
@@ -435,26 +494,26 @@ export default function App() {
 
               {/* 7. OTA/린칸 테스트 랩 탭 */}
               {activeTab === 'SIMULATION' && (
-                <div style={{ maxWidth: '900px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                  <div style={{ backgroundColor: '#131d36', padding: '2rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                    <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: '#f8fafc' }}>
+                <div className="flex max-w-[900px] flex-col gap-6">
+                  <div className="rounded-xl border border-white/10 bg-[#131d36] p-8">
+                    <h2 className="mb-2 text-xl font-bold text-slate-100">
                       🧪 OTA & 채널 매니저(CMS) 연동 테스트 랩
                     </h2>
-                    <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
+                    <p className="text-xs text-slate-400">
                       가상 채널 인입 전문과 대량 예약 생성 시나리오를 실행하여 배정 로직과 Gemini 태그 파싱을 검증합니다.
                     </p>
                   </div>
 
-                  <div style={{ backgroundColor: '#131d36', padding: '1.8rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', marginBottom: '0.5rem' }}>
+                  <div className="rounded-xl border border-white/10 bg-[#131d36] p-7">
+                    <div className="mb-2 flex items-center gap-2 text-sky-400">
                       <ListChecks size={22} />
-                      <h3 style={{ margin: 0, fontSize: '1.15rem' }}>테스트 케이스 요구사항 인입 콘솔 (50건 순환 주입 풀)</h3>
+                      <h3 className="text-base font-bold">테스트 케이스 요구사항 인입 콘솔 (50건 순환 주입 풀)</h3>
                     </div>
-                    <p style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5, marginBottom: '1.2rem' }}>
+                    <p className="mb-5 text-xs leading-relaxed text-slate-400">
                       테스트하고 싶은 고객 요청사항을 아래에 추가하세요. (한글 조합 엔터 중복 방어 적용 완료)
                     </p>
 
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '1.2rem' }}>
+                    <div className="mb-5 flex gap-2">
                       <input
                         type="text"
                         placeholder="예: 롯데 월드타워 전망이 보이는 방으로 주세요."
@@ -467,28 +526,28 @@ export default function App() {
                             addCustomRequirement();
                           }
                         }}
-                        style={{ flex: 1, padding: '0.7rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }}
+                        className="flex-1 rounded-md border border-[#293548] bg-[#0b1329] p-3 text-xs text-white focus:border-sky-400"
                       />
                       <button
                         type="button"
                         onClick={addCustomRequirement}
-                        style={{ padding: '0.7rem 1.2rem', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        className="flex items-center gap-1.5 rounded-md bg-sky-600 px-5 py-3 text-xs font-semibold text-white hover:bg-sky-500"
                       >
                         <Plus size={16} /> 추가
                       </button>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto', backgroundColor: '#0b1329', padding: '0.8rem', borderRadius: '8px', border: '1px solid #293548' }}>
+                    <div className="flex max-h-[200px] flex-col gap-1.5 overflow-y-auto rounded-lg border border-[#293548] bg-[#0b1329] p-3">
                       {customRequirements.map((reqText, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#131d36', padding: '0.55rem 0.85rem', borderRadius: '6px', fontSize: '0.85rem' }}>
-                          <span style={{ color: '#cbd5e1' }}>
-                            <b style={{ color: '#38bdf8', marginRight: '6px' }}>#{idx + 1}</b>
+                        <div key={idx} className="flex items-center justify-between rounded-md bg-[#131d36] px-3.5 py-2 text-xs">
+                          <span className="text-slate-300">
+                            <b className="mr-2 text-sky-400">#{idx + 1}</b>
                             {reqText}
                           </span>
                           <button
                             type="button"
                             onClick={() => removeCustomRequirement(idx)}
-                            style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px' }}
+                            className="p-1 text-red-400 transition hover:text-red-300"
                             title="삭제"
                           >
                             <Trash2 size={15} />
@@ -498,11 +557,28 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div style={{ backgroundColor: '#131d36', padding: '1.8rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', backgroundColor: '#0b1329', borderRadius: '8px', border: '1px solid #293548' }}>
+                  <div className="flex flex-col gap-5 rounded-xl border border-white/10 bg-[#131d36] p-7">
+                    
+                    {/* 🚀 50인 동적 시드 생성 */}
+                    <div className="flex items-center justify-between rounded-lg border border-emerald-500/50 bg-[#0b1329] p-5">
                       <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#38bdf8' }}>1. 기본 시나리오 샘플 데이터 세팅</h4>
-                        <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>영업일자({businessDate}) 기준 샘플 5건 주입</span>
+                        <h4 className="mb-1 text-sm font-bold text-emerald-400">0. 기준일자({businessDate}) 50인 고유 실명 & OTA 다변화 시드 생성</h4>
+                        <span className="text-xs text-slate-400">
+                          중복 없는 일본/다국적 50명 실명, OTA 6개사(Agoda 등), 당일/재실/미래 일정 자동 배분
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleGenerateDynamic50}
+                        className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-500"
+                      >
+                        <Dices size={16} /> 50인 시드 생성
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg border border-[#293548] bg-[#0b1329] p-5">
+                      <div>
+                        <h4 className="mb-1 text-sm font-bold text-sky-400">1. 기본 시나리오 샘플 데이터 세팅</h4>
+                        <span className="text-xs text-slate-400">영업일자({businessDate}) 기준 샘플 5건 주입</span>
                       </div>
                       <button
                         onClick={async () => {
@@ -510,16 +586,16 @@ export default function App() {
                           alert('샘플 데이터 주입 완료!');
                           void fetchIndicator();
                         }}
-                        style={{ padding: '0.6rem 1rem', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                        className="rounded-md bg-sky-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-sky-500"
                       >
                         데이터 주입
                       </button>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', backgroundColor: '#0b1329', borderRadius: '8px', border: '1px solid #293548' }}>
+                    <div className="flex items-center justify-between rounded-lg border border-[#293548] bg-[#0b1329] p-5">
                       <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#c084fc' }}>2. 신규 50건 (요구사항 순환 주입) + 재실 30건 대량 인입</h4>
-                        <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>총 {6 + customRequirements.length}개 풀을 순환하여 50건 생성</span>
+                        <h4 className="mb-1 text-sm font-bold text-purple-400">2. 신규 50건 (요구사항 순환 주입) + 재실 30건 대량 인입</h4>
+                        <span className="text-xs text-slate-400">총 {6 + customRequirements.length}개 풀을 순환하여 50건 생성</span>
                       </div>
                       <button
                         onClick={async () => {
@@ -527,16 +603,16 @@ export default function App() {
                           alert(res.message || '대량 데이터 인입 완료!');
                           void fetchIndicator();
                         }}
-                        style={{ padding: '0.6rem 1rem', backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                        className="rounded-md bg-purple-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-purple-500"
                       >
                         대량 인입 실행
                       </button>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem', backgroundColor: '#0b1329', borderRadius: '8px', border: '1px solid #293548' }}>
+                    <div className="flex items-center justify-between rounded-lg border border-[#293548] bg-[#0b1329] p-5">
                       <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#f87171' }}>3. 전체 데이터 초기화</h4>
-                        <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>모든 예약과 191실 객실 상태를 완전한 공실(VACANT)로 리셋합니다.</span>
+                        <h4 className="mb-1 text-sm font-bold text-red-400">3. 전체 데이터 초기화</h4>
+                        <span className="text-xs text-slate-400">모든 예약과 191실 객실 상태를 완전한 공실(VACANT)로 리셋합니다.</span>
                       </div>
                       <button
                         onClick={async () => {
@@ -545,7 +621,7 @@ export default function App() {
                           void fetchIndicator();
                           alert('모든 데이터가 초기화되었습니다.');
                         }}
-                        style={{ padding: '0.6rem 1rem', backgroundColor: '#b91c1c', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                        className="rounded-md bg-red-700 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-red-600"
                       >
                         전체 초기화
                       </button>

@@ -52,6 +52,7 @@ export interface ReservationSearchParams {
   stayingDate?: string;
   status?: string;
   tag?: string;
+  otaChannel?: string; // 🌐 OTA 채널 검색 조건 추가
 }
 
 export interface CreateStaffRequest {
@@ -59,6 +60,17 @@ export interface CreateStaffRequest {
   password: string;
   name: string;
   role: StaffRole;
+}
+
+export interface NightAuditResultDto {
+  previousBusinessDate: string;
+  newBusinessDate: string;
+  noShowCount: number;
+  noShowReservationIds: string[];
+  roomChargePostedCount: number;
+  totalRoomRevenuePosted: number;
+  success: boolean;
+  message: string;
 }
 
 function triggerFileDownload(blobData: BlobPart, fileName: string) {
@@ -166,6 +178,22 @@ export const pmsService = {
     return res.data;
   },
 
+  // 🌙 나이트 오딧 (야간 일일 마감 및 룸차지/노쇼 정리)
+  runNightAudit: async (targetDate: string): Promise<ApiResponse<NightAuditResultDto>> => {
+    const res = await apiClient.post<ApiResponse<NightAuditResultDto>>('/api/reservations/night-audit', null, {
+      params: { targetDate },
+    });
+    return res.data;
+  },
+
+  // 🎲 기준일자 기반 50명 고유 실명 & OTA 시드 생성
+  generateDynamicTestData: async (baseDate: string): Promise<ApiResponse<string>> => {
+    const res = await apiClient.post<ApiResponse<string>>('/api/reservations/generate-test-data', null, {
+      params: { baseDate },
+    });
+    return res.data;
+  },
+
   // 시뮬레이터 연동 메서드
   seedSampleReservations: async () => {
     const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/seed-samples');
@@ -238,6 +266,18 @@ export const pmsService = {
       responseType: 'blob',
     });
     triggerFileDownload(res.data, '태그별_보유객실매핑_매트릭스.csv');
+  },
+
+  // 서버 DB의 공식 영업일자 조회 (단일 진실 공급원)
+  getSystemBusinessDate: async (): Promise<string> => {
+    const res = await apiClient.get<ApiResponse<{ businessDate: string }>>('/api/system/business-date');
+    return res.data.data.businessDate;
+  },
+
+  // 서버 DB 공식 영업일자 수동 보정 (관리자용)
+  setSystemBusinessDate: async (businessDate: string): Promise<string> => {
+    const res = await apiClient.put<ApiResponse<{ businessDate: string }>>('/api/system/business-date', { businessDate });
+    return res.data.data.businessDate;
   },
 };
 
