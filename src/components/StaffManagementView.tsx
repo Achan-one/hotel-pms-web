@@ -32,10 +32,9 @@ export default function StaffManagementView() {
         role,
       });
 
-      setResultMsg({ text: res.message || `[${name}] 신규 직원이 성공적으로 등록되었습니다.` });
+      setResultMsg({ text: res.message || `[${name}] 신규 직원이 등록되었습니다.` });
       setLastCreated({ staffId: staffId.trim(), name: name.trim(), role });
 
-      // 폼 초기화
       setStaffId('');
       setPassword('');
       setName('');
@@ -53,125 +52,110 @@ export default function StaffManagementView() {
   };
 
   return (
-    <div style={{ maxWidth: '900px', display: 'flex', flexDirection: 'column', gap: '1.5rem', color: '#f8fafc' }}>
-      
-      {/* 1. 상단 안내 배너 */}
-      <div style={{ backgroundColor: '#131d36', padding: '1.8rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.4rem' }}>
-          <UserPlus size={26} color="#38bdf8" />
-          <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700 }}>호텔 직원 계정 발급 및 인사 권한 관리</h2>
-        </div>
-        <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-          총지배인(ROLE_ADMIN) 권한으로 신규 입사 직원의 사번과 초기 비밀번호를 생성하고, 시스템 접근 역할을 부여합니다.
+    <div className="flex max-w-[800px] flex-col gap-4 font-sans text-slate-800">
+      <div className="rounded border border-slate-300 bg-white p-5 shadow-2xs">
+        <h2 className="mb-1 text-base font-bold text-slate-900">직원 계정 발급 및 인사 권한 관리</h2>
+        <p className="text-xs text-slate-500">
+          총지배인(ROLE_ADMIN) 권한으로 신규 입사 직원의 사번과 초기 비밀번호를 생성하고 역할을 부여합니다.
         </p>
       </div>
 
-      {/* 2. 직무별 시스템 권한 안내 카드 (3열) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-        <div style={{ backgroundColor: '#131d36', padding: '1.2rem', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.4rem' }}>
-            <Award size={16} /> 호텔 관리자 (ROLE_ADMIN)
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
+          <div className="mb-1 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+            <Award size={14} className="text-blue-700" /> 관리자 (ROLE_ADMIN)
           </div>
-          <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.4 }}>
-            모든 전산 제어(배정, 룸 체인지), 태그 사전 편집 및 <b>신규 직원 계정 발급</b> 권한 보유
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            배정, 룸 체인지, 태그 사전 관리 및 직원 계정 발급 권한
           </p>
         </div>
 
-        <div style={{ backgroundColor: '#131d36', padding: '1.2rem', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#34d399', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.4rem' }}>
-            <Shield size={16} /> 정규사원 (ROLE_STAFF)
+        <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
+          <div className="mb-1 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+            <Shield size={14} className="text-emerald-700" /> 정직원 (ROLE_STAFF)
           </div>
-          <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.4 }}>
-            일괄 자동 배정, 수동 객실 지정, 룸 체인지, 예약 원장 수정 및 체크인/아웃 수행
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            일괄 배정, 수동 객실 지정, 룸 체인지 및 입퇴실 처리
           </p>
         </div>
 
-        <div style={{ backgroundColor: '#131d36', padding: '1.2rem', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fbbf24', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.4rem' }}>
-            <User size={16} /> 아르바이트 (ROLE_PART_TIME)
+        <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
+          <div className="mb-1 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+            <User size={14} className="text-amber-700" /> 아르바이트 (ROLE_PART_TIME)
           </div>
-          <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.4 }}>
-            191실 룸 인디케이터 열람, 현장 체크인 및 퇴실(체크아웃) 정산 제어만 허용
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            191실 매트릭스 열람, 현장 체크인 및 퇴실 정산만 허용
           </p>
         </div>
       </div>
 
-      {/* 3. 처리 결과 알림 */}
       {resultMsg && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          backgroundColor: resultMsg.isError ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-          color: resultMsg.isError ? '#fca5a5' : '#6ee7b7',
-          border: `1px solid ${resultMsg.isError ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
-          padding: '0.85rem 1.2rem', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 600
-        }}>
-          {resultMsg.isError ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+        <div className={`flex items-center gap-2 rounded border p-3 text-xs font-semibold ${
+          resultMsg.isError ? 'border-rose-300 bg-rose-50 text-rose-800' : 'border-emerald-300 bg-emerald-50 text-emerald-800'
+        }`}>
+          {resultMsg.isError ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
           <span>{resultMsg.text}</span>
         </div>
       )}
 
-      {/* 4. 신규 발급 입력 폼 */}
-      <form onSubmit={handleSubmit} style={{
-        backgroundColor: '#131d36', padding: '2rem', borderRadius: '10px',
-        border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '1.2rem'
-      }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.2rem' }}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded border border-slate-300 bg-white p-5 shadow-2xs">
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '6px', fontWeight: 600 }}>
-              <KeyRound size={14} color="#38bdf8" /> 사번 / 로그인 ID
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+              <KeyRound size={13} className="text-slate-500" /> 사번 (로그인 ID)
             </label>
             <input
               type="text"
               placeholder="예: staff_2026_01"
               value={staffId}
               onChange={(e) => setStaffId(e.target.value)}
-              style={{ width: '100%', padding: '0.7rem 0.9rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }}
+              className="w-full rounded border border-slate-300 bg-white p-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
               required
             />
           </div>
 
           <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '6px', fontWeight: 600 }}>
-              <User size={14} color="#38bdf8" /> 직원 성명 (실명)
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+              <User size={13} className="text-slate-500" /> 성명
             </label>
             <input
               type="text"
-              placeholder="예: 김민수"
+              placeholder="예: 홍길동"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              style={{ width: '100%', padding: '0.7rem 0.9rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }}
+              className="w-full rounded border border-slate-300 bg-white p-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
               required
             />
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.2rem' }}>
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '6px', fontWeight: 600 }}>
-              <Lock size={14} color="#38bdf8" /> 초기 임시 비밀번호
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+              <Lock size={13} className="text-slate-500" /> 초기 비밀번호
             </label>
             <input
               type="password"
-              placeholder="초기 접속용 비밀번호 입력"
+              placeholder="비밀번호 입력"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={{ width: '100%', padding: '0.7rem 0.9rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }}
+              className="w-full rounded border border-slate-300 bg-white p-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
               required
             />
           </div>
 
           <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '6px', fontWeight: 600 }}>
-              <Shield size={14} color="#38bdf8" /> 부여할 권한 및 역할
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+              <Shield size={13} className="text-slate-500" /> 역할 및 권한
             </label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as StaffRole)}
-              style={{ width: '100%', padding: '0.68rem 0.9rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }}
+              className="w-full rounded border border-slate-300 bg-white p-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
             >
-              <option value="ROLE_STAFF">정규사원 (ROLE_STAFF) - 일반 배정 및 운영</option>
-              <option value="ROLE_PART_TIME">아르바이트 (ROLE_PART_TIME) - 단순 체크인/아웃</option>
-              <option value="ROLE_ADMIN">호텔 관리자 (ROLE_ADMIN) - 전산 총괄</option>
+              <option value="ROLE_STAFF">정직원 (ROLE_STAFF)</option>
+              <option value="ROLE_PART_TIME">아르바이트 (ROLE_PART_TIME)</option>
+              <option value="ROLE_ADMIN">관리자 (ROLE_ADMIN)</option>
             </select>
           </div>
         </div>
@@ -179,30 +163,20 @@ export default function StaffManagementView() {
         <button
           type="submit"
           disabled={loading}
-          style={{
-            marginTop: '0.5rem', padding: '0.85rem', borderRadius: '6px',
-            backgroundColor: loading ? '#0369a1' : '#0284c7', color: '#fff',
-            border: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: loading ? 'not-allowed' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-          }}
+          className="mt-1 flex items-center justify-center gap-1.5 rounded bg-blue-600 py-2.5 text-xs font-bold text-white transition hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
         >
-          <UserPlus size={18} />
-          {loading ? '신규 계정 발급 중...' : '신규 직원 계정 발급 (DB 영구 저장)'}
+          <UserPlus size={14} />
+          {loading ? '계정 생성 중...' : '신규 직원 계정 발급'}
         </button>
       </form>
 
-      {/* 5. 직전 발급 내역 카드 */}
       {lastCreated && (
-        <div style={{ backgroundColor: '#0b1329', padding: '1.2rem 1.5rem', borderRadius: '8px', border: '1px solid #293548', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="flex items-center justify-between rounded border border-slate-300 bg-white p-3 text-xs shadow-2xs">
           <div>
-            <div style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 700, marginBottom: '2px' }}>방금 발급된 계정 정보</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>
-              {lastCreated.name} ({lastCreated.staffId}) - <span style={{ color: '#34d399' }}>{lastCreated.role}</span>
-            </div>
+            <span className="font-bold text-slate-900">{lastCreated.name} ({lastCreated.staffId})</span>
+            <span className="ml-2 font-mono text-slate-500">[{lastCreated.role}]</span>
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-            해당 직원에게 사번과 초기 비밀번호를 안내해주세요.
-          </span>
+          <span className="text-slate-400">발급 완료</span>
         </div>
       )}
     </div>

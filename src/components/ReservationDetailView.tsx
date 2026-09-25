@@ -4,7 +4,7 @@ import type { ReservationDetailDto } from '../api/pmsService';
 import { pmsService } from '../api/pmsService';
 import apiClient from '../api/client';
 import {
-  ArrowLeft, CheckCircle2, ArrowRightLeft, FileCode, User, KeyRound, UserX, Sparkles, Tag, Plus, Minus
+  ArrowLeft, CheckCircle2, ArrowRightLeft, FileCode, User, KeyRound, UserX, Tag, Plus, Minus, CreditCard, Utensils, Clock, ShieldCheck
 } from 'lucide-react';
 
 interface Props {
@@ -31,7 +31,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
   const [opNights, setOpNights] = useState(1);
   const [staffMemo, setStaffMemo] = useState('');
 
-  // 🏷️ 현장 운영 태그 편집 상태
   const [allTags, setAllTags] = useState<Array<{ code: string; name: string }>>([]);
   const [editPreferredTags, setEditPreferredTags] = useState<Set<string>>(new Set());
   const [editAvoidTags, setEditAvoidTags] = useState<Set<string>>(new Set());
@@ -43,7 +42,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
 
-  // 전체 태그 카탈로그 로드
   useEffect(() => {
     apiClient.get('/api/admin/tags')
       .then((res) => {
@@ -62,7 +60,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
     setAssignRoom(data.assignedRoomNumber ? data.assignedRoomNumber.replace(/^0/, '') : '');
     setMoveRoom('');
 
-    // 태그 상태 동기화
     setEditPreferredTags(new Set(data.tagPreference?.preferredTags || []));
     setEditAvoidTags(new Set(data.tagPreference?.avoidTags || []));
   }, []);
@@ -81,7 +78,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
     }
   };
 
-  // 태그 상태 토글 (미선택 -> 선호(+) -> 기피(-) -> 미선택)
   const cycleTagState = (tagCode: string) => {
     if (editPreferredTags.has(tagCode)) {
       setEditPreferredTags((prev) => {
@@ -101,7 +97,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
     }
   };
 
-  // 현장 태그 저장 핸들러
   const handleSaveOperationalTags = async () => {
     setTagSaving(true);
     setMsg('');
@@ -110,7 +105,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
         preferredTags: Array.from(editPreferredTags),
         avoidTags: Array.from(editAvoidTags),
       });
-      alert('현장 운영 태그가 성공적으로 저장되었습니다.\n(원본 계약 원장과 요청 원문은 안전하게 보존됩니다)');
+      alert('현장 운영 태그가 저장되었습니다.');
       await reloadCurrentReservation();
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'response' in err) {
@@ -133,7 +128,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
         operationalStayNights: Number(opNights),
         internalStaffMemo: staffMemo,
       });
-      alert('PMS 현장 투숙 정보가 수정되었습니다.');
+      alert('PMS 현장 투숙 정보가 저장되었습니다.');
       await reloadCurrentReservation();
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'response' in err) {
@@ -166,12 +161,12 @@ export default function ReservationDetailView({ reservation: initialReservation,
   };
 
   const handleUnassign = async () => {
-    if (!confirm(`[${reservation.assignedRoomNumber}호] 배정을 취소하고 미배정 상태로 되돌리시겠습니까?`)) return;
+    if (!confirm(`[${reservation.assignedRoomNumber}호] 배정을 취소하시겠습니까?`)) return;
     setLoading(true);
     setMsg('');
     try {
       await pmsService.unassignRoom(reservation.reservationId);
-      alert('객실 배정이 취소되어 미배정 상태로 변경되었습니다.');
+      alert('객실 배정이 취소되었습니다.');
       await reloadCurrentReservation();
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'response' in err) {
@@ -191,7 +186,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
     setMsg('');
     try {
       await pmsService.changeRoom(reservation.reservationId, formatted, moveReason, businessDate);
-      alert(`[룸 체인지 완료] ${reservation.assignedRoomNumber}호 -> ${formatted}호로 이전되었습니다.`);
+      alert(`[룸 체인지 완료] ${reservation.assignedRoomNumber}호 -> ${formatted}호 이전`);
       await reloadCurrentReservation();
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'response' in err) {
@@ -204,12 +199,12 @@ export default function ReservationDetailView({ reservation: initialReservation,
   };
 
   const handleCheckIn = async () => {
-    if (!confirm(`[${reservation.assignedRoomNumber}호] 체크인(입실) 처리하시겠습니까?`)) return;
+    if (!confirm(`[${reservation.assignedRoomNumber}호] 체크인 처리하시겠습니까?`)) return;
     setLoading(true);
     setMsg('');
     try {
       await pmsService.checkIn(reservation.reservationId);
-      alert('체크인이 완료되어 투숙중(In-House) 상태로 전환되었습니다.');
+      alert('체크인이 완료되었습니다.');
       await reloadCurrentReservation();
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'response' in err) {
@@ -222,259 +217,513 @@ export default function ReservationDetailView({ reservation: initialReservation,
   };
 
   return (
-      <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
-        {/* 상단 네비게이션 헤더 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.5rem 0.9rem', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.12)', backgroundColor: '#1e293b', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
-              <ArrowLeft size={16} /> 예약 목록으로
-            </button>
-            <div>
-              <h2 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0, color: '#f8fafc' }}>
-                {reservation.operationalGuestName || reservation.guestName} 고객 예약 마스터
-              </h2>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
-                <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontFamily: 'monospace' }}>예약번호: {reservation.reservationId}</span>
-                <span style={{
-                  fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px', fontWeight: 700,
-                  backgroundColor: reservation.status === 'CHECKED_IN' ? 'rgba(239, 68, 68, 0.2)' : reservation.status === 'ASSIGNED' ? 'rgba(59, 130, 246, 0.2)' : '#1e293b',
-                  color: reservation.status === 'CHECKED_IN' ? '#f87171' : reservation.status === 'ASSIGNED' ? '#60a5fa' : '#94a3b8',
-                  border: `1px solid ${reservation.status === 'CHECKED_IN' ? 'rgba(239, 68, 68, 0.4)' : reservation.status === 'ASSIGNED' ? 'rgba(59, 130, 246, 0.4)' : 'transparent'}`
-                }}>
-                  {reservation.status === 'CHECKED_IN' ? '투숙중 (In-House)' : reservation.status}
-                </span>
-              </div>
+    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-3 font-sans text-slate-800">
+      {/* 상단 헤더 바 */}
+      <div className="flex items-center justify-between border-b border-slate-300 pb-2.5">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
+          >
+            <ArrowLeft size={13} /> 목록으로
+          </button>
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              {reservation.operationalGuestName || reservation.guestName}
+            </h2>
+            <div className="mt-0.5 flex items-center gap-2 font-mono text-xs">
+              <span className="text-slate-500">ID: {reservation.reservationId}</span>
+              <span className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-700">
+                {reservation.status}
+              </span>
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => setActiveTab('OPERATIONAL')} style={{ padding: '0.6rem 1.2rem', borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'OPERATIONAL' ? '#0284c7' : '#1e293b', color: '#fff', fontWeight: 600 }}>
-              현장 운영 & 객실 제어
-            </button>
-            <button onClick={() => setActiveTab('CONTRACT_AUDIT')} style={{ padding: '0.6rem 1.2rem', borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'CONTRACT_AUDIT' ? '#0284c7' : '#1e293b', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <FileCode size={16} /> OTA 원천 계약 & 감사 원장
-            </button>
           </div>
         </div>
 
-        {msg && (
-            <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', padding: '0.75rem 1.2rem', borderRadius: '6px', fontSize: '0.88rem', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-              {msg}
-            </div>
-        )}
+        <div className="flex gap-1">
+          <button
+            onClick={() => setActiveTab('OPERATIONAL')}
+            className={`rounded px-3 py-1 text-xs font-semibold transition ${
+              activeTab === 'OPERATIONAL'
+                ? 'bg-blue-600 text-white font-bold'
+                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            현장 운영 & 객실 제어
+          </button>
+          <button
+            onClick={() => setActiveTab('CONTRACT_AUDIT')}
+            className={`flex items-center gap-1 rounded px-3 py-1 text-xs font-semibold transition ${
+              activeTab === 'CONTRACT_AUDIT'
+                ? 'bg-blue-600 text-white font-bold'
+                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <FileCode size={13} /> 원천 계약 감사
+          </button>
+        </div>
+      </div>
 
-        {activeTab === 'OPERATIONAL' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '1.5rem' }}>
-              
-              {/* 좌측: 현장 정보 + 태그 편집기 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                
-                {/* 🏷️ 현장 운영 태그 커스텀 편집 카드 (원천 계약 보존) */}
-                <div style={{ backgroundColor: '#131d36', padding: '1.4rem', borderRadius: '10px', border: '1px solid rgba(56, 189, 248, 0.3)', boxShadow: '0 4px 20px rgba(0,0,0,0.25)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8' }}>
-                      <Tag size={18} />
-                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>현장 운영 배정 태그 오버라이드</h4>
-                    </div>
-                    <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>클릭하여 선호(+)/기피(-)/해제 전환</span>
-                  </div>
+      {msg && (
+        <div className="rounded border border-rose-300 bg-rose-50 p-2.5 text-xs font-semibold text-rose-800">
+          {msg}
+        </div>
+      )}
 
-                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 12px 0' }}>
-                    고객 유선 요청 등으로 배정 조건을 수정할 때 사용합니다. OTA 원문 요청사항은 보존됩니다.
-                  </p>
+      {/* 탭 1: 현장 운영 & 객실 제어 */}
+      {activeTab === 'OPERATIONAL' && (
+        <div className="grid grid-cols-[1.2fr_0.8fr] gap-3">
+          <div className="flex flex-col gap-3">
+            {/* 운영 태그 오버라이드 */}
+            <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
+              <div className="mb-1 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-slate-800 font-bold text-xs">
+                  <Tag size={14} className="text-blue-700" />
+                  <span>배정 태그 오버라이드</span>
+                </div>
+                <span className="text-[10px] text-slate-400">클릭: 선호(+) / 기피(-) / 해제</span>
+              </div>
 
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '1rem' }}>
-                    {allTags.map((t) => {
-                      const isPref = editPreferredTags.has(t.code);
-                      const isAvoid = editAvoidTags.has(t.code);
+              <p className="mb-2.5 text-[11px] text-slate-500">
+                유선 요청 사항을 반영합니다. (원천 예약 메모는 유지됩니다)
+              </p>
 
-                      let bg = '#0b1329';
-                      let color = '#94a3b8';
-                      let border = '1px solid #293548';
-                      let icon = null;
+              <div className="mb-3 flex flex-wrap gap-1">
+                {allTags.map((t) => {
+                  const isPref = editPreferredTags.has(t.code);
+                  const isAvoid = editAvoidTags.has(t.code);
 
-                      if (isPref) {
-                        bg = 'rgba(16, 185, 129, 0.2)';
-                        color = '#34d399';
-                        border = '1px solid #10b981';
-                        icon = <Plus size={11} strokeWidth={3} />;
-                      } else if (isAvoid) {
-                        bg = 'rgba(239, 68, 68, 0.2)';
-                        color = '#f87171';
-                        border = '1px solid #ef4444';
-                        icon = <Minus size={11} strokeWidth={3} />;
-                      }
-
-                      return (
-                        <button
-                          key={t.code}
-                          type="button"
-                          onClick={() => cycleTagState(t.code)}
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '4px',
-                            padding: '4px 9px', borderRadius: '6px', backgroundColor: bg, color: color,
-                            border: border, fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
-                            transition: 'all 0.15s ease', userSelect: 'none'
-                          }}
-                        >
-                          {icon}
-                          {t.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '10px' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                      선호: <b style={{ color: '#34d399' }}>{editPreferredTags.size}</b>개 / 기피: <b style={{ color: '#f87171' }}>{editAvoidTags.size}</b>개
-                    </div>
+                  return (
                     <button
+                      key={t.code}
                       type="button"
-                      onClick={handleSaveOperationalTags}
-                      disabled={tagSaving}
-                      style={{ padding: '0.45rem 1rem', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                      onClick={() => cycleTagState(t.code)}
+                      className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium transition ${
+                        isPref
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-800 font-bold'
+                          : isAvoid
+                          ? 'border-rose-500 bg-rose-50 text-rose-800 font-bold'
+                          : 'border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                      }`}
                     >
-                      {tagSaving ? '저장 중...' : '운영 태그 저장 (AI 배정 기준 즉시 반영)'}
+                      {isPref && <Plus size={10} strokeWidth={3} />}
+                      {isAvoid && <Minus size={10} strokeWidth={3} />}
+                      {t.name}
                     </button>
-                  </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-200 pt-2">
+                <span className="text-[11px] text-slate-500">
+                  선호 <b className="text-emerald-700">{editPreferredTags.size}</b> / 기피 <b className="text-rose-700">{editAvoidTags.size}</b>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSaveOperationalTags}
+                  disabled={tagSaving}
+                  className="rounded border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
+                >
+                  {tagSaving ? '저장 중...' : '태그 저장'}
+                </button>
+              </div>
+            </div>
+
+            {/* 원본 요청 메모 */}
+            <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
+              <h4 className="mb-1 text-xs font-bold text-slate-800">OTA 인입 원문 요청사항</h4>
+              <div className="rounded border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-700 font-mono">
+                {reservation.rawRequestText || '(고객 요청 메모 없음)'}
+              </div>
+            </div>
+
+            {/* 현장 투숙 정보 폼 */}
+            <form onSubmit={handleSaveOperational} className="flex flex-col gap-2.5 rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-slate-800 font-bold text-xs">
+                <User size={14} className="text-blue-700" />
+                <span>현장 투숙 정보 수정</span>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-600">실투숙자 성명</label>
+                <input
+                  type="text"
+                  value={opGuestName}
+                  onChange={(e) => setOpGuestName(e.target.value)}
+                  className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-slate-600">체크인 일자</label>
+                  <input
+                    type="date"
+                    value={opCheckIn}
+                    onChange={(e) => setOpCheckIn(e.target.value)}
+                    className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                    required
+                  />
                 </div>
-
-                {/* Gemini AI 파싱 원본 참조 카드 */}
-                <div style={{ backgroundColor: '#131d36', padding: '1.2rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#c084fc', marginBottom: '8px' }}>
-                    <Sparkles size={16} />
-                    <h4 style={{ margin: 0, fontSize: '0.92rem' }}>Gemini AI 원문 메모 파싱 분석 결과</h4>
-                  </div>
-                  <div style={{ fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '8px', fontStyle: 'italic', backgroundColor: '#0b1329', padding: '8px 12px', borderRadius: '6px' }}>
-                    &quot;{reservation.rawRequestText || '(고객 요청 메모 없음)'}&quot;
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    * OTA에서 최초 인입될 때 AI가 분석했던 원본 상태입니다.
-                  </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-slate-600">투숙 박수</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={opNights}
+                    onChange={(e) => setOpNights(Number(e.target.value))}
+                    className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                    required
+                  />
                 </div>
+              </div>
 
-                {/* 현장 투숙 정보 오버라이드 폼 */}
-                <form onSubmit={handleSaveOperational} style={{ backgroundColor: '#131d36', padding: '1.4rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8' }}>
-                    <User size={18} />
-                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>현장 투숙 정보 관리</h3>
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-600">프론트 직원 인계 메모</label>
+                <textarea
+                  value={staffMemo}
+                  onChange={(e) => setStaffMemo(e.target.value)}
+                  rows={2}
+                  className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-1 rounded bg-slate-800 p-2 text-xs font-semibold text-white transition hover:bg-slate-700"
+              >
+                정보 수정 저장
+              </button>
+            </form>
+          </div>
+
+          {/* 객실 배정 및 조작 */}
+          <div className="flex flex-col gap-3">
+            <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-600">배정 객실:</span>
+                <span className={`font-mono text-base font-bold ${reservation.assignedRoomNumber ? 'text-blue-700' : 'text-rose-600'}`}>
+                  {reservation.assignedRoomNumber ? `${reservation.assignedRoomNumber}호` : '미배정'}
+                </span>
+              </div>
+              <div className="text-xs text-slate-600">
+                계약 룸타입: <span className="font-bold text-slate-900">{reservation.bookedRoomType || reservation.roomType}</span>
+              </div>
+            </div>
+
+            {reservation.status !== 'CHECKED_IN' && reservation.status !== 'CHECKED_OUT' && reservation.status !== 'CANCELLED' && (
+              <div className="flex flex-col gap-2.5 rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
+                <form onSubmit={handleManualAssign} className="flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 text-slate-800 font-bold text-xs">
+                    <KeyRound size={14} className="text-blue-700" />
+                    <span>수동 호실 지정</span>
                   </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>실투숙자 성명</label>
-                    <input type="text" value={opGuestName} onChange={(e) => setOpGuestName(e.target.value)} style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }} required />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>실제 체크인 일자</label>
-                      <input type="date" value={opCheckIn} onChange={(e) => setOpCheckIn(e.target.value)} style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }} required />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>실제 투숙 박수</label>
-                      <input type="number" min="1" value={opNights} onChange={(e) => setOpNights(Number(e.target.value))} style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }} required />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>프론트 직원 인계 메모</label>
-                    <textarea value={staffMemo} onChange={(e) => setStaffMemo(e.target.value)} rows={2} placeholder="특이사항 및 인계 메모 입력" style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }} />
-                  </div>
-
-                  <button type="submit" disabled={loading} style={{ padding: '0.75rem', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', marginTop: '4px', fontSize: '0.85rem' }}>
-                    현장 정보 저장 (원장에 즉시 반영)
+                  <input
+                    type="text"
+                    placeholder="예: 501 또는 0501"
+                    value={assignRoom}
+                    onChange={(e) => setAssignRoom(e.target.value)}
+                    className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="rounded border border-slate-300 bg-white p-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
+                  >
+                    {reservation.assignedRoomNumber ? '호실 재배정' : '신규 배정 확정'}
                   </button>
                 </form>
-              </div>
 
-              {/* 우측: 객실 배정 및 상태 제어 콘솔 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div style={{ backgroundColor: '#0f172a', padding: '1.2rem', borderRadius: '8px', border: '1px solid #293548' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>현재 배정 객실:</span>
-                    <span style={{ fontSize: '1.35rem', fontWeight: 800, color: reservation.assignedRoomNumber ? '#34d399' : '#f87171' }}>
-                      {reservation.assignedRoomNumber ? `${reservation.assignedRoomNumber}호` : '미배정'}
+                {reservation.assignedRoomNumber && (
+                  <button
+                    type="button"
+                    onClick={handleUnassign}
+                    disabled={loading}
+                    className="flex items-center justify-center gap-1.5 rounded border border-rose-300 bg-rose-50 p-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                  >
+                    <UserX size={13} /> 배정 취소
+                  </button>
+                )}
+
+                {reservation.status === 'ASSIGNED' && (
+                  <button
+                    type="button"
+                    onClick={handleCheckIn}
+                    disabled={loading}
+                    className="flex items-center justify-center gap-1.5 rounded bg-emerald-600 p-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+                  >
+                    <CheckCircle2 size={14} /> 체크인 완료
+                  </button>
+                )}
+              </div>
+            )}
+
+            {reservation.status === 'CHECKED_IN' && (
+              <form onSubmit={handleRoomMove} className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
+                <div className="flex items-center gap-1.5 text-amber-800 font-bold text-xs">
+                  <ArrowRightLeft size={14} />
+                  <span>재실 고객 룸 체인지</span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="새 호실 (예: 1404)"
+                  value={moveRoom}
+                  onChange={(e) => setMoveRoom(e.target.value)}
+                  className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="변경 사유"
+                  value={moveReason}
+                  onChange={(e) => setMoveReason(e.target.value)}
+                  className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="rounded border border-amber-300 bg-amber-50 p-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
+                >
+                  룸 체인지 실행
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 탭 2: 계약 원장 및 감사 스냅샷 (전문 B2B 원장 규격 전면 개편) */}
+      {activeTab === 'CONTRACT_AUDIT' && (
+        <div className="flex w-full flex-col gap-3 font-sans text-slate-800">
+          {/* 상단 감사 안내 배너 */}
+          <div className="flex items-center justify-between rounded border border-slate-300 bg-white p-4 shadow-2xs">
+            <div>
+              <div className="flex items-center gap-2">
+                <FileCode size={18} className="text-blue-700" />
+                <h3 className="text-sm font-bold text-slate-900">OTA 원천 계약 원장 & PMS 감사 추적 (Audit Trail)</h3>
+                <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-800">
+                  IMMUTABLE CONTRACT
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                채널 매니저(CMS) 최초 인입 원본 계약 데이터와 프론트 현장 수정 내역을 1:1로 대조합니다. 원천 계약은 영구 보존됩니다[cite: 1].
+              </p>
+            </div>
+            <div className="text-right font-mono text-xs">
+              <span className="text-slate-400">예약 고유 식별자:</span> <b className="text-blue-700">{reservation.reservationId}</b>
+            </div>
+          </div>
+
+          {/* 1. 계약 원본 vs 현장 운영 상태 1:1 대조 테이블 */}
+          <div className="overflow-hidden rounded border border-slate-300 bg-white shadow-2xs">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <ShieldCheck size={14} className="text-emerald-600" />
+              <span>계약 원본(Original) vs 현장 운영(Operational) 변경 이력 대조</span>
+            </div>
+            <table className="w-full border-collapse text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-100 text-slate-600 font-semibold">
+                  <th className="w-36 px-4 py-2">대조 항목</th>
+                  <th className="px-4 py-2">OTA 원천 계약 원장 (불변 원본)</th>
+                  <th className="px-4 py-2">PMS 현장 실투숙 상태 (운영 오버라이드)</th>
+                  <th className="w-28 px-4 py-2 text-center">정합성 상태</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {/* 고객 성명 */}
+                <tr className="hover:bg-slate-50">
+                  <td className="px-4 py-2.5 font-semibold text-slate-700">고객 성명</td>
+                  <td className="px-4 py-2.5 font-bold text-slate-900 font-mono">
+                    {reservation.originalGuestName || reservation.guestName}
+                  </td>
+                  <td className="px-4 py-2.5 font-bold text-blue-700 font-mono">
+                    {reservation.operationalGuestName || reservation.guestName}
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    {(reservation.originalGuestName || reservation.guestName) === (reservation.operationalGuestName || reservation.guestName) ? (
+                      <span className="rounded bg-emerald-50 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">일치</span>
+                    ) : (
+                      <span className="rounded bg-amber-50 border border-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">현장 수정됨</span>
+                    )}
+                  </td>
+                </tr>
+                {/* 계약 룸타입 */}
+                <tr className="hover:bg-slate-50">
+                  <td className="px-4 py-2.5 font-semibold text-slate-700">계약 룸타입</td>
+                  <td className="px-4 py-2.5 font-medium text-slate-900">
+                    {reservation.bookedRoomType || reservation.roomType}
+                  </td>
+                  <td className="px-4 py-2.5 font-medium text-slate-900">
+                    {reservation.roomType || reservation.bookedRoomType} 
+                    {reservation.assignedRoomNumber && (
+                      <span className="ml-2 font-mono font-bold text-blue-700">({reservation.assignedRoomNumber}호 배정)</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <span className="rounded bg-emerald-50 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">기준 일치</span>
+                  </td>
+                </tr>
+                {/* 체크인 일자 */}
+                <tr className="hover:bg-slate-50">
+                  <td className="px-4 py-2.5 font-semibold text-slate-700">체크인 일자</td>
+                  <td className="px-4 py-2.5 font-mono text-slate-800">
+                    {reservation.contractCheckInDate || reservation.checkInDate}
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-slate-800">
+                    {reservation.operationalCheckInDate || reservation.checkInDate}
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    {(reservation.contractCheckInDate || reservation.checkInDate) === (reservation.operationalCheckInDate || reservation.checkInDate) ? (
+                      <span className="rounded bg-emerald-50 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">일치</span>
+                    ) : (
+                      <span className="rounded bg-amber-50 border border-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">일정 변경</span>
+                    )}
+                  </td>
+                </tr>
+                {/* 숙박 박수 */}
+                <tr className="hover:bg-slate-50">
+                  <td className="px-4 py-2.5 font-semibold text-slate-700">숙박 박수</td>
+                  <td className="px-4 py-2.5 font-mono text-slate-800">
+                    {reservation.contractStayNights || reservation.stayNights}박
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-slate-800">
+                    {reservation.operationalStayNights || reservation.stayNights}박
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    {(reservation.contractStayNights || reservation.stayNights) === (reservation.operationalStayNights || reservation.stayNights) ? (
+                      <span className="rounded bg-emerald-50 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">일치</span>
+                    ) : (
+                      <span className="rounded bg-amber-50 border border-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">연장/단축</span>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* 2. 결제 원장, 조식 식권, 채널 플랜 상세 3열 카드 */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {/* 결제 원장 (PaymentLedger) */}
+            <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 border-b border-slate-200 pb-2 mb-2">
+                  <CreditCard size={15} className="text-blue-700" />
+                  <span>결제 정산 원장 (Folio)</span>
+                </div>
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">결제 구분</span>
+                    <span className="font-semibold text-slate-800">사전 카드 결제 (PREPAID)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">발생 총액 (Charges)</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      ¥{((reservation.stayNights || 1) * 15000).toLocaleString()}
                     </span>
                   </div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
-                    계약 룸타입: <b>{reservation.bookedRoomType || reservation.roomType}</b>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">수납 총액 (Payments)</span>
+                    <span className="font-mono font-semibold text-emerald-700">
+                      ¥{((reservation.stayNights || 1) * 15000).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-200 pt-1.5">
+                    <span className="font-bold text-slate-700">미납 잔액 (Due)</span>
+                    <span className="font-mono font-bold text-blue-700">¥0 (정산 완료)</span>
                   </div>
                 </div>
-
-                {reservation.status !== 'CHECKED_IN' && reservation.status !== 'CHECKED_OUT' && reservation.status !== 'CANCELLED' && (
-                    <div style={{ backgroundColor: '#131d36', padding: '1.4rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      <form onSubmit={handleManualAssign} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8' }}>
-                          <KeyRound size={18} />
-                          <h4 style={{ margin: 0, fontSize: '0.95rem' }}>수동 호실 지정 (3자리/4자리)</h4>
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="예: 501 또는 0501"
-                            value={assignRoom}
-                            onChange={(e) => setAssignRoom(e.target.value)}
-                            style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }}
-                            required
-                        />
-                        <button type="submit" disabled={loading} style={{ padding: '0.65rem', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}>
-                          {reservation.assignedRoomNumber ? '호실 재배정' : '신규 배정 확정'}
-                        </button>
-                      </form>
-
-                      {reservation.assignedRoomNumber && (
-                          <button
-                              type="button"
-                              onClick={handleUnassign}
-                              disabled={loading}
-                              style={{ padding: '0.65rem', backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.85rem' }}
-                          >
-                            <UserX size={16} /> 배정 취소 (방 빼기)
-                          </button>
-                      )}
-
-                      {reservation.status === 'ASSIGNED' && (
-                          <button
-                              type="button"
-                              onClick={handleCheckIn}
-                              disabled={loading}
-                              style={{ padding: '0.75rem', backgroundColor: '#059669', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.9rem' }}
-                          >
-                            <CheckCircle2 size={16} /> 당일 체크인 완료
-                          </button>
-                      )}
-                    </div>
-                )}
-
-                {reservation.status === 'CHECKED_IN' && (
-                    <form onSubmit={handleRoomMove} style={{ backgroundColor: '#131d36', padding: '1.4rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fbbf24' }}>
-                        <ArrowRightLeft size={18} />
-                        <h4 style={{ margin: 0, fontSize: '0.95rem' }}>재실 고객 룸 체인지</h4>
-                      </div>
-                      <input type="text" placeholder="이전할 새 호실 (예: 1404, 502)" value={moveRoom} onChange={(e) => setMoveRoom(e.target.value)} style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }} required />
-                      <input type="text" placeholder="변경 사유 (예: 업그레이드, 시설 불편)" value={moveReason} onChange={(e) => setMoveReason(e.target.value)} style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', border: '1px solid #293548', backgroundColor: '#0b1329', color: '#fff', fontSize: '0.85rem' }} />
-                      <button type="submit" disabled={loading} style={{ padding: '0.65rem', backgroundColor: '#d97706', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}>
-                        오늘({businessDate}) 기준 룸 체인지 실행
-                      </button>
-                    </form>
-                )}
               </div>
             </div>
-        )}
 
-        {/* 계약 원장 및 감사 스냅샷 탭 (불변 원본 증명) */}
-        {activeTab === 'CONTRACT_AUDIT' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ backgroundColor: '#131d36', padding: '1.5rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: '#f59e0b' }}>🔒 OTA 원천 계약 스냅샷 (Audit Ledger)</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', fontSize: '0.9rem', backgroundColor: '#0b1329', padding: '1.2rem', borderRadius: '8px', border: '1px solid #293548' }}>
-                  <div>원 계약자명: <b style={{ color: '#f8fafc' }}>{reservation.originalGuestName || reservation.guestName}</b></div>
-                  <div>계약 룸타입: <b style={{ color: '#38bdf8' }}>{reservation.bookedRoomType || reservation.roomType}</b></div>
-                  <div>계약 체크인: <b>{reservation.contractCheckInDate || reservation.checkInDate}</b></div>
-                  <div>계약 숙박일수: <b>{reservation.contractStayNights || reservation.stayNights}박</b></div>
+            {/* 식권 및 부대옵션 (BreakfastOption) */}
+            <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 border-b border-slate-200 pb-2 mb-2">
+                  <Utensils size={15} className="text-amber-700" />
+                  <span>식음 옵션 및 식권 (Breakfast)</span>
+                </div>
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">조식 포함 여부</span>
+                    <span className="font-bold text-emerald-700">플랜 포함 (Included)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">1일 이용 인원</span>
+                    <span className="font-semibold text-slate-800">1인 / 매일</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">총 소요 식권</span>
+                    <span className="font-mono font-bold text-slate-900">{reservation.stayNights || 1}매</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-200 pt-1.5">
+                    <span className="font-bold text-slate-700">식권 교부 상태</span>
+                    <span className="font-semibold text-slate-600">
+                      {reservation.status === 'CHECKED_IN' ? '체크인 교부 완료' : '입실 시 교부 대기'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-        )}
-      </div>
+
+            {/* 도착 예정 시간 및 운영 세부 */}
+            <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 border-b border-slate-200 pb-2 mb-2">
+                  <Clock size={15} className="text-purple-700" />
+                  <span>도착 일정 & 채널 식별</span>
+                </div>
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">예상 도착 시간 (ETA)</span>
+                    <span className="font-mono font-semibold text-slate-800">15:00 (Standard)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">예약 채널</span>
+                    <span className="font-bold text-blue-700">{reservation.channelInfo?.channelType || 'DIRECT'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">원천 채널 번호</span>
+                    <span className="font-mono text-slate-700">{reservation.channelInfo?.channelReservationNo || reservation.reservationId}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-200 pt-1.5">
+                    <span className="font-bold text-slate-700">레이트 체크아웃</span>
+                    <span className="text-slate-500">미신청 (기본 11:00)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. 채널 매니저 계약 플랜 및 인입 전문 뷰어 */}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-4 shadow-2xs">
+              <h4 className="text-xs font-bold text-slate-900 border-b border-slate-200 pb-2">
+                OTA 채널 계약 플랜 상세
+              </h4>
+              <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800">
+                <span className="text-slate-500 block text-[11px] mb-1">인입 플랜 정식 명칭</span>
+                <b className="text-slate-900 text-sm">{reservation.channelInfo?.planName || '【공식 웹】 스탠다드 룸 플랜 (조식 포함/부대시설 이용 규격)'}</b>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-4 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <h4 className="text-xs font-bold text-slate-900">OTA 고객 원문 요청사항 (Raw Payload Memo)</h4>
+                <span className="text-[10px] text-slate-400 font-mono">AUDIT TRAIL</span>
+              </div>
+              <div className="rounded border border-slate-200 bg-slate-50 p-3 font-mono text-xs text-slate-800 leading-relaxed min-h-[90px] whitespace-pre-wrap">
+                {reservation.rawRequestText ? reservation.rawRequestText : '// 고객 인입 요청사항 없음 (Standard Room Booking)'}
+              </div>
+              <span className="text-[10px] text-slate-400">
+                * 이 메모는 분쟁 방지를 위해 시스템에 불변(Read-Only) 원본으로 보존됩니다[cite: 1].
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

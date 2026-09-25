@@ -85,38 +85,36 @@ export default function ExportReportView({ businessDate }: Props) {
   };
 
   return (
-    <div className="flex max-w-[1050px] flex-col gap-6 text-slate-100">
-      {/* 타이틀 배너 */}
-      <div className="rounded-xl border border-white/10 bg-[#131d36] p-7">
-        <div className="mb-1.5 flex items-center gap-2.5">
-          <FileDown className="h-6 w-6 text-sky-400" />
-          <h2 className="text-xl font-bold">운영 데이터 및 실무 리포트 엑스포트 (CSV)</h2>
+    <div className="flex max-w-[950px] flex-col gap-4 font-sans text-slate-800">
+      <div className="rounded border border-slate-300 bg-white p-5 shadow-2xs">
+        <div className="mb-1 flex items-center gap-2">
+          <FileDown className="h-5 w-5 text-blue-700" />
+          <h2 className="text-base font-bold text-slate-900">운영 데이터 및 실무 리포트 엑스포트 (CSV)</h2>
         </div>
-        <p className="text-xs leading-relaxed text-slate-400">
+        <p className="text-xs text-slate-500">
           프론트 데스크 실무 보고서 및 룸-태그 인벤토리 매트릭스를 UTF-8 BOM CSV 형식으로 즉시 추출합니다.
         </p>
       </div>
 
-      {/* 리포트 카드 그리드 (2열) */}
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-        {/* 리포트 1: 숙박자 리스트 (In-House) */}
-        <div className="flex flex-col justify-between gap-5 rounded-xl border border-white/10 bg-[#131d36] p-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {/* 리포트 1 */}
+        <div className="flex flex-col justify-between gap-4 rounded border border-slate-300 bg-white p-4 shadow-2xs">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-emerald-400">
-              <Users size={20} />
-              <h3 className="text-base font-bold">1. 숙박자 리스트 (In-House)</h3>
+            <div className="mb-1 flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+              <Users size={16} className="text-emerald-700" />
+              <span>1. 숙박자 리스트 (In-House)</span>
             </div>
-            <p className="mb-4 text-xs leading-relaxed text-slate-400">
+            <p className="mb-3 text-[11px] text-slate-500">
               체류일자 기준 실제 투숙(재실) 중인 인원 목록입니다. (기준 영업일자: {businessDate} 초과 불가)
             </p>
 
-            <label className="mb-1 block text-xs text-slate-300">체류 기준 일자</label>
+            <label className="mb-1 block text-[11px] font-semibold text-slate-600">체류 기준 일자</label>
             <input
               type="date"
               max={businessDate}
               value={stayTargetDate}
               onChange={(e) => setStayTargetDate(e.target.value)}
-              className="w-full rounded border border-[#293548] bg-[#0b1329] p-2 text-xs text-white focus:border-sky-400"
+              className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
             />
           </div>
 
@@ -124,40 +122,40 @@ export default function ExportReportView({ businessDate }: Props) {
             type="button"
             onClick={handleDownloadInHouse}
             disabled={isStayingDownloading}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-sky-600 p-2.5 text-xs font-bold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed"
+            className="flex w-full items-center justify-center gap-1 rounded bg-slate-800 p-2 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:bg-slate-200 disabled:text-slate-400"
           >
-            <FileDown size={15} />
-            {isStayingDownloading ? 'CSV 생성 중...' : '숙박자 CSV 다운로드'}
+            <FileDown size={14} />
+            {isStayingDownloading ? '생성 중...' : '숙박자 CSV 다운로드'}
           </button>
         </div>
 
-        {/* 리포트 2: 예약자 리스트 (Bookings) */}
-        <div className="flex flex-col justify-between gap-5 rounded-xl border border-white/10 bg-[#131d36] p-6">
+        {/* 리포트 2 */}
+        <div className="flex flex-col justify-between gap-4 rounded border border-slate-300 bg-white p-4 shadow-2xs">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-sky-400">
-              <BookmarkCheck size={20} />
-              <h3 className="text-base font-bold">2. 예약자 리스트</h3>
+            <div className="mb-1 flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+              <BookmarkCheck size={16} className="text-blue-700" />
+              <span>2. 예약자 리스트</span>
             </div>
-            <p className="mb-4 text-xs leading-relaxed text-slate-400">
+            <p className="mb-3 text-[11px] text-slate-500">
               선택한 체크인 일자의 전체 예약 원장과 배정 상태를 출력합니다.
             </p>
 
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="mb-1 block text-xs text-slate-300">체크인 일자</label>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-600">체크인 일자</label>
                 <input
                   type="date"
                   value={reserveStartDate}
                   onChange={(e) => setReserveStartDate(e.target.value)}
-                  className="w-full rounded border border-[#293548] bg-[#0b1329] p-2 text-xs text-white focus:border-sky-400"
+                  className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
                 />
               </div>
               <div className="flex-1">
-                <label className="mb-1 block text-xs text-slate-300">상태 필터</label>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-600">상태 필터</label>
                 <select
                   value={reserveStatus}
                   onChange={(e) => setReserveStatus(e.target.value)}
-                  className="w-full rounded border border-[#293548] bg-[#0b1329] p-2 text-xs text-white focus:border-sky-400"
+                  className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
                 >
                   <option value="">(전체 상태)</option>
                   <option value="PENDING">미배정</option>
@@ -174,30 +172,30 @@ export default function ExportReportView({ businessDate }: Props) {
             type="button"
             onClick={handleDownloadReservations}
             disabled={isReserveDownloading}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-blue-600 p-2.5 text-xs font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed"
+            className="flex w-full items-center justify-center gap-1 rounded bg-slate-800 p-2 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:bg-slate-200 disabled:text-slate-400"
           >
-            <FileDown size={15} />
-            {isReserveDownloading ? 'CSV 생성 중...' : '예약자 CSV 다운로드'}
+            <FileDown size={14} />
+            {isReserveDownloading ? '생성 중...' : '예약자 CSV 다운로드'}
           </button>
         </div>
 
-        {/* 리포트 3: 태그 & 요청사항 리스트 */}
-        <div className="flex flex-col justify-between gap-5 rounded-xl border border-white/10 bg-[#131d36] p-6">
+        {/* 리포트 3 */}
+        <div className="flex flex-col justify-between gap-4 rounded border border-slate-300 bg-white p-4 shadow-2xs">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-purple-400">
-              <Tag size={20} />
-              <h3 className="text-base font-bold">3. 태그 & 요청사항 리스트</h3>
+            <div className="mb-1 flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+              <Tag size={16} className="text-purple-700" />
+              <span>3. 태그 & 요청사항 리스트</span>
             </div>
-            <p className="mb-4 text-xs leading-relaxed text-slate-400">
-              고객 원문 요청, AI 파싱 태그, <b>배정 객실의 실제 보유 태그</b> 및 HARD 제약 미충족 사유를 전수 대조합니다.
+            <p className="mb-3 text-[11px] text-slate-500">
+              고객 원문 요청, AI 파싱 태그, 배정 객실의 보유 태그를 대조합니다.
             </p>
 
-            <label className="mb-1 block text-xs text-slate-300">도착 기준 일자</label>
+            <label className="mb-1 block text-[11px] font-semibold text-slate-600">도착 기준 일자</label>
             <input
               type="date"
               value={tagTargetDate}
               onChange={(e) => setTagTargetDate(e.target.value)}
-              className="w-full rounded border border-[#293548] bg-[#0b1329] p-2 text-xs text-white focus:border-sky-400"
+              className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
             />
           </div>
 
@@ -205,26 +203,26 @@ export default function ExportReportView({ businessDate }: Props) {
             type="button"
             onClick={handleDownloadSpecialRequests}
             disabled={isTagDownloading}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-purple-600 p-2.5 text-xs font-bold text-white transition hover:bg-purple-500 disabled:cursor-not-allowed"
+            className="flex w-full items-center justify-center gap-1 rounded bg-slate-800 p-2 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:bg-slate-200 disabled:text-slate-400"
           >
-            <FileDown size={15} />
-            {isTagDownloading ? 'CSV 생성 중...' : '태그 & 요청사항 CSV 다운로드'}
+            <FileDown size={14} />
+            {isTagDownloading ? '생성 중...' : '태그 & 요청사항 CSV 다운로드'}
           </button>
         </div>
 
-        {/* 리포트 4: 룸 태그 인디케이터 (인벤토리) */}
-        <div className="flex flex-col justify-between gap-5 rounded-xl border border-white/10 bg-[#131d36] p-6">
+        {/* 리포트 4 */}
+        <div className="flex flex-col justify-between gap-4 rounded border border-slate-300 bg-white p-4 shadow-2xs">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-amber-400">
-              <Layers size={20} />
-              <h3 className="text-base font-bold">4. 룸 태그 인디케이터 (인벤토리)</h3>
+            <div className="mb-1 flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+              <Layers size={16} className="text-amber-700" />
+              <span>4. 룸 태그 인벤토리</span>
             </div>
-            <p className="mb-4 text-xs leading-relaxed text-slate-400">
-              191실 전 객실의 보유 태그 목록(방 기준)과 각 태그별 배치 객실 번호 목록(태그 기준)을 다운로드합니다.
+            <p className="mb-3 text-[11px] text-slate-500">
+              191실 전 객실의 보유 태그 목록과 태그별 배치 객실 목록을 다운로드합니다.
             </p>
 
-            <div className="rounded border border-dashed border-slate-700 bg-[#0b1329] p-2.5 text-[11px] text-slate-400">
-              건축 물리 특성 및 어드민 커스텀 태그 전체 반영
+            <div className="rounded border border-dashed border-slate-300 bg-slate-50 p-2 text-[11px] text-slate-600">
+              건축 물리 특성 및 관리자 커스텀 태그 전체 반영
             </div>
           </div>
 
@@ -233,9 +231,9 @@ export default function ExportReportView({ businessDate }: Props) {
               type="button"
               onClick={handleDownloadRoomTags}
               disabled={isRoomTagsDownloading}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-amber-600 p-2.5 text-xs font-bold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed"
+              className="flex flex-1 items-center justify-center gap-1 rounded bg-slate-800 p-2 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:bg-slate-200 disabled:text-slate-400"
             >
-              <Building size={14} />
+              <Building size={13} />
               {isRoomTagsDownloading ? '생성 중...' : '방별 태그 CSV'}
             </button>
 
@@ -243,9 +241,9 @@ export default function ExportReportView({ businessDate }: Props) {
               type="button"
               onClick={handleDownloadTagMatrix}
               disabled={isTagMatrixDownloading}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-amber-700 p-2.5 text-xs font-bold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed"
+              className="flex flex-1 items-center justify-center gap-1 rounded border border-slate-300 bg-white p-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
             >
-              <Tag size={14} />
+              <Tag size={13} />
               {isTagMatrixDownloading ? '생성 중...' : '태그별 방 CSV'}
             </button>
           </div>

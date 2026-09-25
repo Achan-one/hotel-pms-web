@@ -52,7 +52,7 @@ export interface ReservationSearchParams {
   stayingDate?: string;
   status?: string;
   tag?: string;
-  otaChannel?: string; // 🌐 OTA 채널 검색 조건 추가
+  otaChannel?: string;
 }
 
 export interface CreateStaffRequest {
@@ -178,7 +178,7 @@ export const pmsService = {
     return res.data;
   },
 
-  // 🌙 나이트 오딧 (야간 일일 마감 및 룸차지/노쇼 정리)
+  // 나이트 오딧 (야간 일일 마감)
   runNightAudit: async (targetDate: string): Promise<ApiResponse<NightAuditResultDto>> => {
     const res = await apiClient.post<ApiResponse<NightAuditResultDto>>('/api/reservations/night-audit', null, {
       params: { targetDate },
@@ -186,7 +186,7 @@ export const pmsService = {
     return res.data;
   },
 
-  // 🎲 기준일자 기반 50명 고유 실명 & OTA 시드 생성
+  // 🎲 기준일자 기반 50명 동적 시드 생성
   generateDynamicTestData: async (baseDate: string): Promise<ApiResponse<string>> => {
     const res = await apiClient.post<ApiResponse<string>>('/api/reservations/generate-test-data', null, {
       params: { baseDate },
@@ -194,26 +194,32 @@ export const pmsService = {
     return res.data;
   },
 
-  // 시뮬레이터 연동 메서드
-  seedSampleReservations: async () => {
-    const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/seed-samples');
+  // 🚀 [보정] 영업일자를 쿼리 파라미터로 함께 전송하여 날짜 불일치 방어
+  seedSampleReservations: async (targetDate?: string) => {
+    const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/seed-samples', null, {
+      params: targetDate ? { targetDate } : {},
+    });
     return res.data;
   },
-  seedSampleData: async () => {
-    return pmsService.seedSampleReservations();
+  seedSampleData: async (targetDate?: string) => {
+    return pmsService.seedSampleReservations(targetDate);
   },
 
-  simulateLincoln: async () => {
-    const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/lincoln-mock');
+  simulateLincoln: async (targetDate?: string) => {
+    const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/lincoln-mock', null, {
+      params: targetDate ? { targetDate } : {},
+    });
     return res.data;
   },
-  simulateLincolnXml: async () => {
-    return pmsService.simulateLincoln();
+  simulateLincolnXml: async (targetDate?: string) => {
+    return pmsService.simulateLincoln(targetDate);
   },
 
-  bulkSimulate50And30: async (customNotes?: string[]) => {
+  bulkSimulate50And30: async (customNotes?: string[], targetDate?: string) => {
     const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/bulk-simulate-50-and-30', {
       customNotes: customNotes || [],
+    }, {
+      params: targetDate ? { targetDate } : {},
     });
     return res.data;
   },
@@ -268,13 +274,13 @@ export const pmsService = {
     triggerFileDownload(res.data, '태그별_보유객실매핑_매트릭스.csv');
   },
 
-  // 서버 DB의 공식 영업일자 조회 (단일 진실 공급원)
+  // 서버 DB의 공식 영업일자 조회
   getSystemBusinessDate: async (): Promise<string> => {
     const res = await apiClient.get<ApiResponse<{ businessDate: string }>>('/api/system/business-date');
     return res.data.data.businessDate;
   },
 
-  // 서버 DB 공식 영업일자 수동 보정 (관리자용)
+  // 서버 DB 공식 영업일자 수동 보정
   setSystemBusinessDate: async (businessDate: string): Promise<string> => {
     const res = await apiClient.put<ApiResponse<{ businessDate: string }>>('/api/system/business-date', { businessDate });
     return res.data.data.businessDate;

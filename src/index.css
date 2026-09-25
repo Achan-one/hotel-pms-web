@@ -2,21 +2,18 @@
 
 @layer base {
   :root {
-    --bg-app: #0f172a;        /* 전체 배경: slate-900 */
-    --bg-surface: #1e293b;    /* 카드/사이드바: slate-800 */
-    --bg-input: #0f172a;      /* 인풋/셀렉트: slate-900 */
-    --border-color: #334155;  /* 단정한 구분선: slate-700 */
-    --border-subtle: #1e293b;
-    --text-primary: #f8fafc;  /* 본문: slate-50 */
-    --text-secondary: #94a3b8;/* 보조: slate-400 */
-    --text-muted: #64748b;    /* 레이블: slate-500 */
-    --accent: #2563eb;        /* 단정하고 신뢰감 있는 코퍼레이트 블루: blue-600 */
+    --bg-app: #f1f5f9;        /* 배경: Slate-100 */
+    --bg-surface: #ffffff;    /* 카드/패널: 순백색 */
+    --border-color: #cbd5e1;  /* 선명하고 얇은 그레이 보더 */
+    --text-primary: #0f172a;  /* 진한 차콜 블랙 */
+    --text-secondary: #475569;/* 보조 텍스트 */
+    --accent: #1e3a8a;        /* 클래식 호텔 네이비: Blue-900 */
   }
 
   body {
     background-color: var(--bg-app);
     color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
   }
 }

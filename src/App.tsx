@@ -10,7 +10,7 @@ import TagManagementView from './components/TagManagementView';
 import ExportReportView from './components/ExportReportView';
 import StaffManagementView from './components/StaffManagementView';
 import {
-  LogIn, RefreshCw, Hotel, Sparkles, Clock, Plus, Trash2, ListChecks, CheckCircle2, AlertCircle, Moon, Dices
+  LogIn, RefreshCw, Hotel, Clock, Plus, Trash2, ListChecks, CheckCircle2, AlertCircle
 } from 'lucide-react';
 
 export default function App() {
@@ -24,7 +24,6 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // 1. 공식 영업일자 State (서버 DB와 실시간 동기화)
   const [businessDate, setBusinessDate] = useState('2026-09-20');
 
   const [indicatorData, setIndicatorData] = useState<FloorMapResponseDto | null>(null);
@@ -111,7 +110,6 @@ export default function App() {
     return () => window.removeEventListener('auth-unauthorized', handleUnauthorized);
   }, [handleLogout]);
 
-  // 2. 로그인 시 서버 DB의 공식 영업일자 조회하여 단일 진실 공급원 동기화
   useEffect(() => {
     if (!currentUser) return;
     pmsService.getSystemBusinessDate()
@@ -140,7 +138,6 @@ export default function App() {
     }
   }, [currentUser, activeTab, fetchIndicator]);
 
-  // 3. 헤더 인풋에서 영업일자를 변경할 때 서버 DB에도 즉시 동기화
   const handleBusinessDateChange = async (newDate: string) => {
     setBusinessDate(newDate);
     try {
@@ -160,7 +157,7 @@ export default function App() {
       const res: any = await pmsService.runBatchAssign(businessDate);
       const successCount = res?.data?.successfulAssignments?.length ?? 0;
       const failCount = res?.data?.failedAssignments?.length ?? 0;
-      const summaryMsg = `AI 일괄 배정 완료: 성공 ${successCount}건 / 실패 ${failCount}건 (${businessDate})`;
+      const summaryMsg = `일괄 배정 완료: 성공 ${successCount}건 / 실패 ${failCount}건 (${businessDate})`;
 
       setAssignToast({ message: summaryMsg });
       void fetchIndicator();
@@ -179,32 +176,20 @@ export default function App() {
     }
   };
 
-  // 4. 나이트 오딧 실행 핸들러 (서버 DB가 이미 익일 롤오버 처리함)
   const handleRunNightAudit = async () => {
-    if (!confirm(`[주의] ${businessDate} 기준 나이트 오딧을 실행하시겠습니까?\n\n1. 미체크인 당일 도착건: 노쇼 취소 및 방 반납\n2. 재실 고객: 1박 객실료 자동 청구\n3. 영업일자: 익일로 자동 변경`)) return;
+    if (!confirm(`[일일 야간 마감]\n${businessDate} 기준 나이트 오딧을 실행하시겠습니까?\n\n- 미체크인 당일 도착건: 노쇼 취소 및 방 반납\n- 재실 고객: 1박 숙박료 청구원장 자동 가산\n- 영업일자: 익일(+1일) 전진`)) return;
 
     setIsNightAuditing(true);
     try {
       const res = await pmsService.runNightAudit(businessDate);
       const audit = res.data;
-      alert(`🌙 [나이트 오딧 마감 완료]\n- 노쇼 취소: ${audit.noShowCount}건\n- 룸차지 포스팅: ${audit.roomChargePostedCount}실 (총 ¥${audit.totalRoomRevenuePosted.toLocaleString()})\n- 신규 영업일자: ${audit.newBusinessDate}`);
+      alert(`[마감 완료]\n- 노쇼 취소: ${audit.noShowCount}건\n- 숙박료 포스팅: ${audit.roomChargePostedCount}실 (총 ¥${audit.totalRoomRevenuePosted.toLocaleString()})\n- 신규 영업일자: ${audit.newBusinessDate}`);
       setBusinessDate(audit.newBusinessDate);
       void fetchIndicator();
     } catch (err: any) {
       alert('나이트 오딧 실패: ' + (err.response?.data?.message || err.message));
     } finally {
       setIsNightAuditing(false);
-    }
-  };
-
-  const handleGenerateDynamic50 = async () => {
-    if (!confirm(`현재 선택된 영업일자(${businessDate})를 기준으로 50명의 고유 실명 및 OTA(Agoda, Booking 등) 예약을 생성하시겠습니까?`)) return;
-    try {
-      const res = await pmsService.generateDynamicTestData(businessDate);
-      alert(res.message || `${businessDate} 기준 50인 예약 생성 완료!`);
-      void fetchIndicator();
-    } catch (err: any) {
-      alert('데이터 생성 실패: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -218,60 +203,61 @@ export default function App() {
     setCustomRequirements((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // 실무 시인성 강화 파스텔 팔레트
   const getStatusClass = (status: RoomMatrixItemDto['status']) => {
     switch (status) {
-      case 'OCCUPIED': return 'bg-[#450a0a] border-red-500 text-red-300';
-      case 'ASSIGNED': return 'bg-[#172554] border-blue-500 text-blue-300';
-      case 'OUT': return 'bg-[#451a03] border-amber-500 text-amber-300';
-      case 'CLEANING': return 'bg-[#083344] border-cyan-500 text-cyan-300';
-      case 'BREAK': return 'bg-zinc-800 border-zinc-500 text-zinc-300';
-      case 'BLOCKED': return 'bg-purple-950 border-purple-500 text-purple-300';
+      case 'OCCUPIED': return 'bg-[#ffe4e6] border-[#f43f5e] text-[#9f1239]';
+      case 'ASSIGNED': return 'bg-[#e0f2fe] border-[#0284c7] text-[#0369a1]';
+      case 'OUT': return 'bg-[#fef3c7] border-[#d97706] text-[#b45309]';
+      case 'CLEANING': return 'bg-[#ccfbf1] border-[#0d9488] text-[#115e59]';
+      case 'BREAK': return 'bg-[#e2e8f0] border-[#64748b] text-[#334155]';
+      case 'BLOCKED': return 'bg-[#f3e8ff] border-[#9333ea] text-[#6b21a8]';
       case 'VACANT':
-      default: return 'bg-emerald-950 border-emerald-500 text-emerald-300';
+      default: return 'bg-[#ecfdf5] border-[#10b981] text-[#047857]';
     }
   };
 
   if (!currentUser) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-900">
-        <form onSubmit={handleLogin} className="w-[380px] rounded-xl border border-white/10 bg-slate-800 p-10 text-slate-100 shadow-2xl">
-          <div className="mb-6 flex items-center gap-2.5">
-            <Hotel className="h-8 w-8 text-sky-400" />
-            <h2 className="text-2xl font-bold">HOTEL PMS</h2>
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 font-sans text-slate-800">
+        <form onSubmit={handleLogin} className="w-[360px] rounded border border-slate-300 bg-white p-8 shadow-sm">
+          <div className="mb-5 flex items-center gap-2.5">
+            <Hotel className="h-6 w-6 text-slate-800" />
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">HOTEL PMS</h2>
           </div>
-          <p className="mb-6 text-sm text-slate-400">프론트 데스크 운영 시스템 로그인</p>
+          <p className="mb-5 text-xs text-slate-500">프론트 데스크 운영 시스템 로그인</p>
           {loginError && (
-            <div className="mb-4 rounded-md border border-red-700 bg-red-900/60 p-3 text-sm text-red-200">
+            <div className="mb-4 rounded border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-700">
               {loginError}
             </div>
           )}
-          <div className="mb-4">
-            <label className="mb-2 block text-xs font-semibold text-slate-300">직원 ID</label>
+          <div className="mb-3.5">
+            <label className="mb-1 block text-xs font-semibold text-slate-700">사번 (ID)</label>
             <input
               type="text"
               value={staffId}
               onChange={(e) => setStaffId(e.target.value)}
               placeholder="예: admin"
-              className="w-full rounded-md border border-slate-600 bg-slate-900 p-3 text-sm text-white focus:border-sky-400"
+              className="w-full rounded border border-slate-300 bg-white p-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
               required
             />
           </div>
-          <div className="mb-6">
-            <label className="mb-2 block text-xs font-semibold text-slate-300">비밀번호</label>
+          <div className="mb-5">
+            <label className="mb-1 block text-xs font-semibold text-slate-700">비밀번호</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="hotel1234"
-              className="w-full rounded-md border border-slate-600 bg-slate-900 p-3 text-sm text-white focus:border-sky-400"
+              placeholder="••••••••"
+              className="w-full rounded border border-slate-300 bg-white p-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
               required
             />
           </div>
           <button
             type="submit"
-            className="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 p-3 font-semibold text-white transition hover:bg-sky-500"
+            className="flex w-full items-center justify-center gap-2 rounded bg-slate-900 py-2.5 text-xs font-bold text-white transition hover:bg-slate-800"
           >
-            <LogIn size={18} /> 로그인
+            <LogIn size={15} /> 로그인
           </button>
         </form>
       </div>
@@ -279,24 +265,21 @@ export default function App() {
   }
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-[#0b1329] text-slate-100">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-[#f1f5f9] font-sans text-slate-800">
       
-      {/* 🔮 우측 상단 플로팅 백그라운드 태스크 위젯 */}
+      {/* 우측 상단 토스트 */}
       {(isAssigning || assignToast) && (
-        <div className={`pointer-events-none fixed top-3 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-2.5 text-xs font-semibold text-slate-100 shadow-2xl ${
-          isAssigning ? 'border-purple-500 bg-[#1e1b4b]' : assignToast?.isError ? 'border-red-500 bg-[#450a0a]' : 'border-emerald-500 bg-[#064e3b]'
+        <div className={`pointer-events-none fixed top-3 right-6 z-50 flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold shadow-md ${
+          isAssigning ? 'border-sky-300 bg-white text-sky-800' : assignToast?.isError ? 'border-rose-300 bg-white text-rose-800' : 'border-emerald-300 bg-white text-emerald-800'
         }`}>
           {isAssigning ? (
             <>
-              <Sparkles size={18} className="spin text-purple-400" />
-              <div>
-                <div className="font-bold text-purple-300">AI 일괄 배정 엔진 연산 중...</div>
-                <div className="text-[11px] text-slate-300">다른 화면으로 이동하셔도 백그라운드에서 완료됩니다</div>
-              </div>
+              <RefreshCw size={13} className="animate-spin text-sky-600" />
+              <span>일괄 자동 배정 처리 중...</span>
             </>
           ) : (
             <>
-              {assignToast?.isError ? <AlertCircle size={18} className="text-red-400" /> : <CheckCircle2 size={18} className="text-emerald-400" />}
+              {assignToast?.isError ? <AlertCircle size={14} className="text-rose-600" /> : <CheckCircle2 size={14} className="text-emerald-600" />}
               <span>{assignToast?.message}</span>
             </>
           )}
@@ -304,46 +287,45 @@ export default function App() {
       )}
 
       {/* 사이드바 */}
-      <div className="h-screen w-[260px] shrink-0">
+      <div className="h-screen w-[230px] shrink-0">
         <Sidebar currentUser={currentUser} activeTab={activeTab} onSelectTab={(tab) => navigateTo(tab, null)} onLogout={handleLogout} />
       </div>
 
       {/* 메인 뷰포트 영역 */}
-      <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex shrink-0 items-center justify-between border-b border-white/10 bg-slate-900 px-8 py-3">
-          <div className="flex items-center gap-3.5">
-            <div className="flex items-center gap-2">
-              <Clock size={16} className="text-sky-400" />
-              <span className="text-xs font-semibold text-slate-400">호텔 공식 영업일자:</span>
+      <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-[#f1f5f9]">
+        <header className="flex h-11 shrink-0 items-center justify-between border-b border-slate-300 bg-white px-5 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Clock size={14} className="text-slate-500" />
+              <span className="text-xs font-bold text-slate-700">공식 영업일자:</span>
               <input
                 type="date"
                 value={businessDate}
                 onChange={(e) => void handleBusinessDateChange(e.target.value)}
-                className="rounded-md border border-sky-400/40 bg-slate-800 px-3 py-1 text-sm font-bold text-sky-400 focus:border-sky-400"
+                className="rounded border border-slate-300 bg-white px-2 py-0.5 font-mono text-xs font-semibold text-slate-900 focus:border-blue-600 focus:outline-none"
               />
             </div>
 
-            {/* 🌙 나이트 오딧 실행 버튼 */}
             <button
               onClick={handleRunNightAudit}
               disabled={isNightAuditing}
               title="야간 일일 마감: 당일 노쇼 자동 취소, 재실 숙박료 정산, 영업일자 익일 롤오버"
-              className={`flex items-center gap-1.5 rounded-md border border-red-600 px-3 py-1.5 text-xs font-bold text-white shadow-md transition ${
-                isNightAuditing ? 'cursor-not-allowed bg-red-900' : 'bg-red-800 hover:bg-red-700'
+              className={`flex items-center gap-1 rounded border border-rose-300 px-2.5 py-0.5 text-xs font-semibold transition ${
+                isNightAuditing ? 'cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
               }`}
             >
-              <Moon size={14} className={isNightAuditing ? 'spin' : ''} />
+              <RefreshCw size={12} className={isNightAuditing ? 'animate-spin' : ''} />
               {isNightAuditing ? '마감 정산 중...' : '나이트 오딧 실행'}
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            <span className="text-xs font-medium text-slate-500">모든 체크인, 룸체인지, 배정의 기준일자</span>
+            <span>정상 운영 (Live)</span>
           </div>
         </header>
 
-        <main className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden p-5 px-8 ${activeTab === 'INDICATOR' ? 'overflow-y-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden p-3.5 ${activeTab === 'INDICATOR' ? 'overflow-y-hidden' : 'overflow-y-auto'}`}>
           {activeDetailReservation ? (
             <ReservationDetailView
               reservation={activeDetailReservation}
@@ -353,100 +335,144 @@ export default function App() {
             />
           ) : (
             <>
-              {/* 1. 191실 룸 인디케이터 탭 */}
+              {/* 1. 191실 룸 매트릭스 탭 */}
               {activeTab === 'INDICATOR' && (
                 <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-2">
-                  <div className="flex shrink-0 items-center justify-between">
-                    <div className="flex items-baseline gap-3">
-                      <h2 className="text-lg font-bold text-slate-100">191실 룸 인디케이터</h2>
-                      <span className="text-xs text-slate-400">기준 영업일자: {businessDate}</span>
+                  <div className="flex shrink-0 items-center justify-between border-b border-slate-300 pb-2">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-sm font-bold text-slate-900">191실 객실 운영 매트릭스 (Room Rack)</h2>
+                      {indicatorData && (
+                        <div className="flex items-center gap-3 text-xs bg-white border border-slate-300 px-3 py-1 rounded shadow-2xs">
+                          <span>총 객실 <b className="font-bold text-slate-900">{indicatorData.totalRooms}</b></span>
+                          <span className="text-slate-300">|</span>
+                          <span>재실 <b className="font-bold text-rose-600">{indicatorData.occupiedRooms}</b></span>
+                          <span className="text-slate-300">|</span>
+                          <span>공실 <b className="font-bold text-emerald-600">{indicatorData.vacantRooms}</b></span>
+                          <span className="text-slate-300">|</span>
+                          <span>점유율 <b className="font-bold text-blue-700">{indicatorData.occupancyRatePercent}%</b></span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex items-center gap-3.5 text-xs">
-                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs bg-emerald-500" /> 공실</span>
-                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs bg-blue-500" /> 배정완료</span>
-                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs bg-red-500" /> 재실(투숙중)</span>
-                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs bg-cyan-500" /> 청소중</span>
+                    <div className="flex items-center gap-3 text-xs font-medium">
+                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs border border-emerald-500 bg-emerald-50" /> 공실(VAC)</span>
+                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs border border-blue-500 bg-blue-50" /> 배정(ASG)</span>
+                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs border border-rose-500 bg-rose-50" /> 재실(OCC)</span>
+                      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-xs border border-teal-500 bg-teal-50" /> 청소(CLN)</span>
                       <button
                         onClick={() => void fetchIndicator()}
-                        className="flex items-center gap-1.5 rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-500"
+                        className="ml-2 flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
                       >
-                        <RefreshCw size={14} className={indicatorLoading ? 'spin' : ''} /> 새로고침
+                        <RefreshCw size={12} className={indicatorLoading ? 'animate-spin' : ''} /> 새로고침
                       </button>
                     </div>
                   </div>
 
                   {indicatorData && (
-                    <div className="flex shrink-0 gap-7 rounded-lg border border-white/10 bg-[#131d36] px-5 py-2 text-xs">
-                      <span>총 객실: <b className="font-bold">{indicatorData.totalRooms}실</b></span>
-                      <span className="text-red-400">점유: <b className="font-bold">{indicatorData.occupiedRooms}실</b></span>
-                      <span className="text-emerald-400">공실: <b className="font-bold">{indicatorData.vacantRooms}실</b></span>
-                      <span className="text-sky-400">점유율: <b className="font-bold">{indicatorData.occupancyRatePercent}%</b></span>
-                    </div>
-                  )}
-
-                  {indicatorData && (
-                    <div className="flex min-h-0 flex-1 flex-col gap-1 rounded-xl border border-white/10 bg-[#131d36] p-3">
-                      {Object.entries(indicatorData.floorRooms)
-                        .sort(([a], [b]) => Number(b) - Number(a))
-                        .map(([floorStr, rooms]) => {
-                          const floor = Number(floorStr);
-                          const prefix = floor < 10 ? `0${floor}` : `${floor}`;
-                          const roomMap = new Map(rooms.map((r) => [r.roomNumber, r]));
-
-                          return (
-                            <div key={floor} className="flex min-h-0 flex-1 items-stretch gap-1.5">
-                              <div className="flex h-full w-11 min-w-[44px] select-none items-center justify-center rounded border border-[#293548] bg-[#0b1329] text-xs font-extrabold text-sky-400">
-                                {floor}F
-                              </div>
-
-                              <div className="grid flex-1 grid-cols-16 gap-1">
-                                {Array.from({ length: 16 }, (_, rIdx) => rIdx + 1).map((r) => {
-                                  const padRoom = r < 10 ? `0${r}` : `${r}`;
-                                  const roomNo = `${prefix}${padRoom}`;
-
-                                  if (r === 13) {
-                                    return (
-                                      <div key={r} title="13호 결번" className="flex h-full select-none items-center justify-center rounded border border-dashed border-[#293548] bg-[#0b1329]/40 text-xs text-slate-600">
-                                        -
-                                      </div>
-                                    );
-                                  }
-
-                                  if (floor >= 14 && (r === 3 || r === 7)) {
-                                    return (
-                                      <div key={r} title="설비/공조실 결번" className="flex h-full select-none items-center justify-center rounded border border-dashed border-slate-700 bg-[#131d36]/40 text-[11px] text-slate-500">
-                                        설비
-                                      </div>
-                                    );
-                                  }
-
-                                  const room = roomMap.get(roomNo);
-                                  if (!room) return <div key={roomNo} className="h-full min-w-0" />;
-
-                                  const tooltipText = `[${room.roomNumber}호] ${room.roomTypeName}\n상태: ${room.status}${room.guestName ? `\n투숙객: ${room.guestName}` : ''}`;
-
-                                  return (
-                                    <div
-                                      key={room.roomNumber}
-                                      title={tooltipText}
-                                      className={`flex h-full min-w-0 select-none flex-col items-center justify-center rounded border px-1 py-0.5 leading-tight ${getStatusClass(room.status)}`}
-                                    >
-                                      <span className="text-xs font-extrabold tracking-tight text-white">
-                                        {room.roomNumber}
-                                      </span>
-                                      {room.guestName && (
-                                        <span className="mt-0.5 block max-w-full truncate text-[10px] opacity-90">
-                                          {room.guestName}
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-slate-300 bg-slate-200/60 p-1.5 shadow-xs">
+                      
+                      {/* 가로 상단 호수 축 헤더 */}
+                      <div className="flex items-center gap-1 pb-1 border-b border-slate-300/80 mb-1">
+                        <div className="w-10 min-w-[40px] text-center text-[10px] font-bold text-slate-500 uppercase">
+                          층 / 호
+                        </div>
+                        <div className="grid flex-1 grid-cols-16 gap-1">
+                          {Array.from({ length: 16 }, (_, i) => i + 1).map((r) => (
+                            <div
+                              key={r}
+                              className={`text-center font-mono text-[10px] font-bold ${
+                                r === 13 ? 'text-slate-400' : 'text-slate-600'
+                              }`}
+                            >
+                              {r < 10 ? `0${r}` : `${r}`}
                             </div>
-                          );
-                        })}
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 층별 행 렌더링 */}
+                      <div className="flex min-h-0 flex-1 flex-col justify-between gap-1">
+                        {Object.entries(indicatorData.floorRooms)
+                          .sort(([a], [b]) => Number(b) - Number(a))
+                          .map(([floorStr, rooms]) => {
+                            const floor = Number(floorStr);
+                            const prefix = floor < 10 ? `0${floor}` : `${floor}`;
+                            const roomMap = new Map(rooms.map((r) => [r.roomNumber, r]));
+
+                            return (
+                              <div key={floor} className="flex min-h-0 flex-1 items-stretch gap-1">
+                                <div className="flex w-10 min-w-[40px] select-none items-center justify-center rounded border border-slate-300 bg-slate-100 font-mono text-xs font-extrabold text-slate-700 shadow-2xs">
+                                  {floor}F
+                                </div>
+
+                                <div className="grid flex-1 grid-cols-16 gap-1">
+                                  {Array.from({ length: 16 }, (_, rIdx) => rIdx + 1).map((r) => {
+                                    const padRoom = r < 10 ? `0${r}` : `${r}`;
+                                    const roomNo = `${prefix}${padRoom}`;
+
+                                    if (r === 13) {
+                                      return (
+                                        <div
+                                          key={r}
+                                          title="13호 서양권 금기 결번"
+                                          className="flex h-full select-none items-center justify-center rounded border border-dashed border-slate-300 bg-slate-100/60 font-mono text-[10px] text-slate-400"
+                                        >
+                                          결번
+                                        </div>
+                                      );
+                                    }
+
+                                    if (floor >= 14 && (r === 3 || r === 7)) {
+                                      return (
+                                        <div
+                                          key={r}
+                                          title="공조/설비실 결번"
+                                          className="flex h-full select-none items-center justify-center rounded border border-slate-300 bg-slate-200/80 font-mono text-[9px] font-semibold text-slate-500"
+                                        >
+                                          설비
+                                        </div>
+                                      );
+                                    }
+
+                                    const room = roomMap.get(roomNo);
+                                    if (!room) return <div key={roomNo} className="h-full min-w-0" />;
+
+                                    const typeCode =
+                                      room.roomType === 'EXECUTIVE_DOUBLE' ? 'EXC' :
+                                      room.roomType === 'SUPERIOR_TWIN' ? 'TWN' :
+                                      room.roomType === 'RESIDENTIAL_DOUBLE' ? 'RSD' :
+                                      room.roomType === 'SUPERIOR_DOUBLE' ? 'SDB' : 'MOD';
+
+                                    return (
+                                      <div
+                                        key={room.roomNumber}
+                                        title={`[${room.roomNumber}호] ${room.roomTypeName}\n상태: ${room.status}${room.guestName ? `\n고객명: ${room.guestName}` : ''}`}
+                                        className={`flex h-full min-w-0 select-none flex-col justify-between rounded border px-1 py-0.5 shadow-2xs transition hover:brightness-95 ${getStatusClass(room.status)}`}
+                                      >
+                                        <div className="flex items-center justify-between border-b border-black/5 pb-0.5 leading-none">
+                                          <span className="font-mono text-[11px] font-extrabold tracking-tight text-slate-900">
+                                            {room.roomNumber}
+                                          </span>
+                                          <span className="font-mono text-[8px] font-bold opacity-60">
+                                            {typeCode}
+                                          </span>
+                                        </div>
+
+                                        <div className="truncate text-center text-[9px] font-semibold leading-none pt-0.5">
+                                          {room.guestName ? (
+                                            <span className="truncate">{room.guestName}</span>
+                                          ) : (
+                                            <span className="opacity-40">-</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -460,25 +486,21 @@ export default function App() {
                 />
               )}
 
-              {/* 3. 규칙 기반 AI 일괄 배정 탭 */}
+              {/* 3. 일괄 배정 탭 */}
               {activeTab === 'BATCH_ASSIGN' && (
-                <div className="max-w-[600px] rounded-xl border border-white/10 bg-[#131d36] p-8">
-                  <div className="mb-4 flex items-center gap-2.5">
-                    <Sparkles className="h-7 w-7 text-purple-400" />
-                    <h2 className="text-xl font-bold text-slate-100">규칙 기반 AI 일괄 배정</h2>
-                  </div>
-                  <p className="mb-6 text-sm leading-relaxed text-slate-400">
-                    호텔 공식 영업일자({businessDate}) 기준 미배정 예약 전체를 대상으로 선호도 및 연박 보호 규칙을 계산하여 빈 객실을 일괄 자동 배정합니다.
+                <div className="max-w-[560px] rounded border border-slate-300 bg-white p-6 shadow-xs">
+                  <h2 className="mb-1.5 text-base font-bold text-slate-900">규칙 기반 일괄 자동 배정</h2>
+                  <p className="mb-5 text-xs text-slate-600 leading-relaxed">
+                    호텔 공식 영업일자({businessDate}) 기준 미배정 예약 전체를 대상으로 선호도 및 연박 보호 규칙을 계산하여 빈 객실을 자동 배정합니다.
                   </p>
                   <button
                     onClick={handleBatchAssign}
                     disabled={isAssigning}
-                    className={`flex w-full items-center justify-center gap-2 rounded-md p-3.5 font-bold text-white transition ${
-                      isAssigning ? 'cursor-not-allowed bg-purple-900' : 'bg-purple-600 hover:bg-purple-500'
+                    className={`flex w-full items-center justify-center gap-2 rounded p-2.5 text-xs font-bold transition ${
+                      isAssigning ? 'cursor-not-allowed bg-slate-200 text-slate-500' : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
-                    <Sparkles size={18} className={isAssigning ? 'spin' : ''} />
-                    {isAssigning ? 'Gemini 2.5 Flash 일괄 분석 & 배정 진행 중...' : `${businessDate} 미배정 예약 일괄 배정 실행`}
+                    {isAssigning ? '일괄 분석 및 배정 진행 중...' : `${businessDate} 미배정 예약 일괄 배정 실행`}
                   </button>
                 </div>
               )}
@@ -486,145 +508,181 @@ export default function App() {
               {/* 4. 태그 사전 관리 탭 */}
               {activeTab === 'TAGS' && <TagManagementView />}
 
-              {/* 5. 신규 직원 계정 발급 탭 (ROLE_ADMIN 총지배인 전용) */}
+              {/* 5. 직원 계정 발급 탭 */}
               {activeTab === 'STAFF_MGMT' && <StaffManagementView />}
 
-              {/* 6. 데이터 엑스포트(CSV) 탭 */}
+              {/* 6. 데이터 엑스포트 탭 */}
               {activeTab === 'EXPORT' && <ExportReportView businessDate={businessDate} />}
 
-              {/* 7. OTA/린칸 테스트 랩 탭 */}
+              {/* 7. CMS 연동 테스트 랩 (0번 삭제 및 기본 6건+커스텀 풀 완성) */}
               {activeTab === 'SIMULATION' && (
-                <div className="flex max-w-[900px] flex-col gap-6">
-                  <div className="rounded-xl border border-white/10 bg-[#131d36] p-8">
-                    <h2 className="mb-2 text-xl font-bold text-slate-100">
-                      🧪 OTA & 채널 매니저(CMS) 연동 테스트 랩
-                    </h2>
-                    <p className="text-xs text-slate-400">
-                      가상 채널 인입 전문과 대량 예약 생성 시나리오를 실행하여 배정 로직과 Gemini 태그 파싱을 검증합니다.
-                    </p>
+                <div className="flex w-full flex-col gap-3 font-sans text-slate-800">
+                  {/* 상단 안내 배너 */}
+                  <div className="flex items-center justify-between rounded border border-slate-300 bg-white p-4 shadow-2xs">
+                    <div>
+                      <h2 className="text-sm font-bold text-slate-900">OTA & 채널 매니저(CMS) 전문 연동 테스트 랩</h2>
+                      <p className="text-xs text-slate-500">
+                        TL-Lincoln 및 ONDA 인입 가상 전문을 주입하여 규칙 기반 배정 및 Gemini 2.5 Flash 태그 분석 엔진을 검증합니다[cite: 5, 7].
+                      </p>
+                    </div>
+                    <span className="rounded border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-xs font-bold text-blue-700">
+                      CMS Sandbox Mode
+                    </span>
                   </div>
 
-                  <div className="rounded-xl border border-white/10 bg-[#131d36] p-7">
-                    <div className="mb-2 flex items-center gap-2 text-sky-400">
-                      <ListChecks size={22} />
-                      <h3 className="text-base font-bold">테스트 케이스 요구사항 인입 콘솔 (50건 순환 주입 풀)</h3>
-                    </div>
-                    <p className="mb-5 text-xs leading-relaxed text-slate-400">
-                      테스트하고 싶은 고객 요청사항을 아래에 추가하세요. (한글 조합 엔터 중복 방어 적용 완료)
-                    </p>
-
-                    <div className="mb-5 flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="예: 롯데 월드타워 전망이 보이는 방으로 주세요."
-                        value={customRequirementInput}
-                        onChange={(e) => setCustomRequirementInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.nativeEvent.isComposing) return;
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            addCustomRequirement();
-                          }
-                        }}
-                        className="flex-1 rounded-md border border-[#293548] bg-[#0b1329] p-3 text-xs text-white focus:border-sky-400"
-                      />
-                      <button
-                        type="button"
-                        onClick={addCustomRequirement}
-                        className="flex items-center gap-1.5 rounded-md bg-sky-600 px-5 py-3 text-xs font-semibold text-white hover:bg-sky-500"
-                      >
-                        <Plus size={16} /> 추가
-                      </button>
-                    </div>
-
-                    <div className="flex max-h-[200px] flex-col gap-1.5 overflow-y-auto rounded-lg border border-[#293548] bg-[#0b1329] p-3">
-                      {customRequirements.map((reqText, idx) => (
-                        <div key={idx} className="flex items-center justify-between rounded-md bg-[#131d36] px-3.5 py-2 text-xs">
-                          <span className="text-slate-300">
-                            <b className="mr-2 text-sky-400">#{idx + 1}</b>
-                            {reqText}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeCustomRequirement(idx)}
-                            className="p-1 text-red-400 transition hover:text-red-300"
-                            title="삭제"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-5 rounded-xl border border-white/10 bg-[#131d36] p-7">
+                  {/* 2열 레이아웃: 좌측(요구사항 인입 풀) / 우측(배치 시나리오 제어) */}
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     
-                    {/* 🚀 50인 동적 시드 생성 */}
-                    <div className="flex items-center justify-between rounded-lg border border-emerald-500/50 bg-[#0b1329] p-5">
-                      <div>
-                        <h4 className="mb-1 text-sm font-bold text-emerald-400">0. 기준일자({businessDate}) 50인 고유 실명 & OTA 다변화 시드 생성</h4>
-                        <span className="text-xs text-slate-400">
-                          중복 없는 일본/다국적 50명 실명, OTA 6개사(Agoda 등), 당일/재실/미래 일정 자동 배분
-                        </span>
+                    {/* 좌측: 고객 요청사항 인입 콘솔 */}
+                    <div className="flex flex-col gap-2.5 rounded border border-slate-300 bg-white p-4 shadow-2xs">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <div className="flex items-center gap-2">
+                          <ListChecks size={16} className="text-blue-700" />
+                          <h3 className="text-xs font-bold text-slate-900">
+                            고객 요청사항 인입 풀 (기본 6건 + 사용자 정의 {customRequirements.length}건)
+                          </h3>
+                        </div>
+                        <span className="text-[11px] text-slate-400">대량 생성 시 순환 매핑</span>
                       </div>
-                      <button
-                        onClick={handleGenerateDynamic50}
-                        className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-500"
-                      >
-                        <Dices size={16} /> 50인 시드 생성
-                      </button>
+
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          placeholder="새 요청사항 입력 (예: 롯데타워 전망 희망, 침대 가드 요청)"
+                          value={customRequirementInput}
+                          onChange={(e) => setCustomRequirementInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.nativeEvent.isComposing) return;
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addCustomRequirement();
+                            }
+                          }}
+                          className="flex-1 rounded border border-slate-300 bg-white p-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={addCustomRequirement}
+                          className="flex items-center gap-1 rounded bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800"
+                        >
+                          <Plus size={13} /> 추가
+                        </button>
+                      </div>
+
+                      <div className="flex max-h-[360px] flex-col gap-1.5 overflow-y-auto rounded border border-slate-200 bg-slate-50/70 p-2">
+                        {/* 기본 탑재 시스템 메모 6건 */}
+                        <div className="text-[10px] font-bold text-slate-400 px-1 pt-1">
+                          [기본 탑재 시스템 메모 6건]
+                        </div>
+                        {[
+                          "어머니 무릎이 안 좋으셔서 엘리베이터 가깝고 낮은 층으로 부탁드립니다.",
+                          "High floor with a nice Tokyo Tower view please!",
+                          "조용한 안쪽 방으로 주세요.",
+                          "도쿄타워 보이는 방으로 꼭 부탁드립니다.",
+                          "아기 동반이라 소음 없는 방 원합니다.",
+                          "(요청사항 없음 - 일반 고객)"
+                        ].map((baseNote, idx) => (
+                          <div key={`base-${idx}`} className="flex items-center justify-between rounded border border-slate-200 bg-slate-100/60 px-2.5 py-1.5 text-xs text-slate-600">
+                            <span className="truncate">
+                              <span className="mr-1.5 font-mono text-[10px] text-slate-400">기본 #{idx + 1}</span>
+                              {baseNote}
+                            </span>
+                            <span className="text-[10px] text-slate-400 shrink-0 font-medium">고정</span>
+                          </div>
+                        ))}
+
+                        {/* 사용자가 추가한 커스텀 메모 */}
+                        {customRequirements.length > 0 && (
+                          <>
+                            <div className="text-[10px] font-bold text-blue-700 px-1 pt-2 border-t border-slate-200 mt-1">
+                              [사용자 정의 추가 메모 {customRequirements.length}건]
+                            </div>
+                            {customRequirements.map((reqText, idx) => (
+                              <div key={idx} className="flex items-center justify-between rounded border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-2xs">
+                                <span className="text-slate-800 font-medium truncate">
+                                  <span className="mr-1.5 font-mono font-bold text-blue-700">커스텀 #{idx + 1}</span>
+                                  {reqText}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeCustomRequirement(idx)}
+                                  className="text-slate-400 hover:text-rose-600 p-0.5 shrink-0"
+                                  title="삭제"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-lg border border-[#293548] bg-[#0b1329] p-5">
-                      <div>
-                        <h4 className="mb-1 text-sm font-bold text-sky-400">1. 기본 시나리오 샘플 데이터 세팅</h4>
-                        <span className="text-xs text-slate-400">영업일자({businessDate}) 기준 샘플 5건 주입</span>
+                    {/* 우측: 시나리오 시뮬레이터 실행 패널 (영업일자 파라미터 연동) */}
+                    <div className="flex flex-col gap-2.5 rounded border border-slate-300 bg-white p-4 shadow-2xs">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <h3 className="text-xs font-bold text-slate-900">시뮬레이션 시나리오 트리거</h3>
+                        <span className="text-[11px] text-slate-400">DB 실시간 반영</span>
                       </div>
-                      <button
-                        onClick={async () => {
-                          await pmsService.seedSampleReservations();
-                          alert('샘플 데이터 주입 완료!');
-                          void fetchIndicator();
-                        }}
-                        className="rounded-md bg-sky-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-sky-500"
-                      >
-                        데이터 주입
-                      </button>
-                    </div>
 
-                    <div className="flex items-center justify-between rounded-lg border border-[#293548] bg-[#0b1329] p-5">
-                      <div>
-                        <h4 className="mb-1 text-sm font-bold text-purple-400">2. 신규 50건 (요구사항 순환 주입) + 재실 30건 대량 인입</h4>
-                        <span className="text-xs text-slate-400">총 {6 + customRequirements.length}개 풀을 순환하여 50건 생성</span>
+                      {/* 시나리오 1 */}
+                      <div className="flex items-center justify-between rounded border border-slate-200 bg-slate-50/70 p-3">
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900">1. 기본 검증용 샘플 데이터 주입 (5건)</h4>
+                          <p className="text-[11px] text-slate-500">
+                            현재 영업일자({businessDate}) 기준 정적 샘플 5건 즉시 적재[cite: 7]
+                          </p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            await pmsService.seedSampleReservations(businessDate);
+                            alert(`영업일자(${businessDate}) 기준 샘플 데이터 5건 주입 완료`);
+                            void fetchIndicator();
+                          }}
+                          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-100"
+                        >
+                          데이터 주입
+                        </button>
                       </div>
-                      <button
-                        onClick={async () => {
-                          const res: any = await pmsService.bulkSimulate50And30(customRequirements);
-                          alert(res.message || '대량 데이터 인입 완료!');
-                          void fetchIndicator();
-                        }}
-                        className="rounded-md bg-purple-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-purple-500"
-                      >
-                        대량 인입 실행
-                      </button>
-                    </div>
 
-                    <div className="flex items-center justify-between rounded-lg border border-[#293548] bg-[#0b1329] p-5">
-                      <div>
-                        <h4 className="mb-1 text-sm font-bold text-red-400">3. 전체 데이터 초기화</h4>
-                        <span className="text-xs text-slate-400">모든 예약과 191실 객실 상태를 완전한 공실(VACANT)로 리셋합니다.</span>
+                      {/* 시나리오 2 */}
+                      <div className="flex items-center justify-between rounded border border-blue-200 bg-blue-50/60 p-3">
+                        <div>
+                          <h4 className="text-xs font-bold text-blue-900">2. 50인 고유 실명 & OTA 대량 인입 (신규 50건 + 재실 30건)</h4>
+                          <p className="text-[11px] text-blue-700">
+                            현재 영업일자({businessDate}) 기준 실명 50건, 6대 OTA 채널 매핑 (미배정 유지)
+                          </p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const res: any = await pmsService.bulkSimulate50And30(customRequirements, businessDate);
+                            alert(res.message || `${businessDate} 기준 50인 실명 및 OTA 예약 인입 완료`);
+                            void fetchIndicator();
+                          }}
+                          className="rounded bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700"
+                        >
+                          대량 인입 실행
+                        </button>
                       </div>
-                      <button
-                        onClick={async () => {
-                          if (!confirm('정말 모든 데이터를 초기화하시겠습니까?')) return;
-                          await pmsService.clearReservations();
-                          void fetchIndicator();
-                          alert('모든 데이터가 초기화되었습니다.');
-                        }}
-                        className="rounded-md bg-red-700 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-red-600"
-                      >
-                        전체 초기화
-                      </button>
+
+                      {/* 시나리오 3 */}
+                      <div className="flex items-center justify-between rounded border border-rose-200 bg-rose-50/60 p-3 mt-auto">
+                        <div>
+                          <h4 className="text-xs font-bold text-rose-800">3. 전체 데이터 초기화</h4>
+                          <p className="text-[11px] text-rose-600">모든 예약 원장 및 191실 객실 상태를 완전한 공실(VACANT)로 리셋[cite: 7]</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (!confirm('정말 모든 데이터를 초기화하시겠습니까?')) return;
+                            await pmsService.clearReservations();
+                            void fetchIndicator();
+                            alert('모든 데이터가 초기화되었습니다.');
+                          }}
+                          className="rounded border border-rose-300 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 shadow-2xs hover:bg-rose-100"
+                        >
+                          전체 초기화
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
