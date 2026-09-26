@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Tag as TagIcon, PlusCircle, Check, Layers, Trash2, RefreshCw, X, SlidersHorizontal, Shield } from 'lucide-react';
+import { Tag as TagIcon, PlusCircle, Layers, Trash2, RefreshCw, X, SlidersHorizontal, Shield } from 'lucide-react';
 import apiClient from '../api/client';
 
 export interface RoomTagItem {
