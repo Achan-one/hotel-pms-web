@@ -1,76 +1,167 @@
 import type { LoginResponse } from '../types/pms';
 import {
-  Hotel, Grid, Search, CheckSquare, LogOut, UserCheck, Beaker, Tag, FileDown, UserPlus
+  LayoutGrid,
+  CalendarCheck,
+  Sparkles,
+  Tags,
+  Users,
+  FileSpreadsheet,
+  Terminal,
+  LogOut,
+  Building2,
+  Landmark,
 } from 'lucide-react';
 
-export type TabType = 'INDICATOR' | 'RESERVATIONS' | 'BATCH_ASSIGN' | 'TAGS' | 'STAFF_MGMT' | 'EXPORT' | 'SIMULATION';
+export type TabType =
+  | 'INDICATOR'
+  | 'RESERVATIONS'
+  | 'BATCH_ASSIGN'
+  | 'TAGS'
+  | 'STAFF_MGMT'
+  | 'CITY_LEDGER'
+  | 'EXPORT'
+  | 'SIMULATION';
 
-interface SidebarProps {
+interface Props {
   currentUser: LoginResponse;
   activeTab: TabType;
   onSelectTab: (tab: TabType) => void;
   onLogout: () => void;
 }
 
-export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout }: SidebarProps) {
-  const menuItems: { id: TabType; label: string; icon: typeof Grid; adminOnly?: boolean }[] = [
-    { id: 'INDICATOR', label: '191실 룸 매트릭스', icon: Grid },
-    { id: 'RESERVATIONS', label: '예약 검색 & 원장 관리', icon: Search },
-    { id: 'BATCH_ASSIGN', label: '일괄 자동 배정', icon: CheckSquare },
-    { id: 'TAGS', label: '태그 사전 관리', icon: Tag },
-    { id: 'STAFF_MGMT', label: '직원 계정 발급', icon: UserPlus, adminOnly: true },
-    { id: 'EXPORT', label: '데이터 엑스포트 (CSV)', icon: FileDown },
-    { id: 'SIMULATION', label: 'Dev Mode', icon: Beaker },
-  ];
+export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout }: Props) {
+  const isAdmin = currentUser.role === 'ROLE_ADMIN';
 
   return (
-    <aside className="sticky top-0 flex h-screen w-[230px] flex-col justify-between border-r border-slate-300 bg-[#1e293b] p-3.5 font-sans text-white">
+    <aside className="flex h-full w-full flex-col justify-between border-r border-slate-300 bg-[#0f172a] text-slate-300 select-none">
       <div>
-        <div className="mb-4 flex items-center gap-2.5 border-b border-slate-700/80 px-2 pb-3.5">
-          <Hotel className="h-5 w-5 text-sky-400" />
-          <div>
-            <h1 className="text-sm font-bold tracking-tight text-white">GRAND PMS</h1>
-            <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">FRONT DESK SYSTEM</span>
+        {/* 상단 호텔 브랜드 헤더 */}
+        <div className="flex h-11 items-center gap-2.5 border-b border-slate-800 px-4">
+          <Building2 size={18} className="text-blue-500" />
+          <div className="flex flex-col">
+            <span className="text-xs font-bold tracking-tight text-white">GRAND PMS</span>
+            <span className="text-[9px] font-semibold text-slate-400">FRONT DESK SYSTEM</span>
           </div>
         </div>
 
-        <nav className="flex flex-col gap-1">
-          {menuItems
-            .filter(item => !item.adminOnly || currentUser.role === 'ROLE_ADMIN')
-            .map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onSelectTab(item.id)}
-                  className={`flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-xs font-semibold transition ${
-                    isActive
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <Icon size={15} className={isActive ? 'text-white' : 'text-slate-400'} />
-                  {item.label}
-                </button>
-              );
-            })}
+        {/* 메인 메뉴 목록 */}
+        <nav className="flex flex-col gap-0.5 p-2 text-xs font-medium">
+          <button
+            onClick={() => onSelectTab('INDICATOR')}
+            className={`flex w-full items-center gap-2.5 rounded px-3 py-2 transition ${
+              activeTab === 'INDICATOR'
+                ? 'bg-blue-600 text-white font-bold'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <LayoutGrid size={15} />
+            <span>191실 룸 매트릭스</span>
+          </button>
+
+          <button
+            onClick={() => onSelectTab('RESERVATIONS')}
+            className={`flex w-full items-center gap-2.5 rounded px-3 py-2 transition ${
+              activeTab === 'RESERVATIONS'
+                ? 'bg-blue-600 text-white font-bold'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <CalendarCheck size={15} />
+            <span>예약 검색 & 원장 관리</span>
+          </button>
+
+          <button
+            onClick={() => onSelectTab('BATCH_ASSIGN')}
+            className={`flex w-full items-center gap-2.5 rounded px-3 py-2 transition ${
+              activeTab === 'BATCH_ASSIGN'
+                ? 'bg-blue-600 text-white font-bold'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <Sparkles size={15} />
+            <span>일괄 자동 배정</span>
+          </button>
+
+          <button
+            onClick={() => onSelectTab('TAGS')}
+            className={`flex w-full items-center gap-2.5 rounded px-3 py-2 transition ${
+              activeTab === 'TAGS'
+                ? 'bg-blue-600 text-white font-bold'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <Tags size={15} />
+            <span>태그 사전 관리</span>
+          </button>
+
+          {/* 🚀 [신규] OTA 정산 원장 (City Ledger) 탭 */}
+          <button
+            onClick={() => onSelectTab('CITY_LEDGER')}
+            className={`flex w-full items-center gap-2.5 rounded px-3 py-2 transition ${
+              activeTab === 'CITY_LEDGER'
+                ? 'bg-blue-600 text-white font-bold'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <Landmark size={15} />
+            <span>OTA 정산 원장 (City Ledger)</span>
+          </button>
+
+          {isAdmin && (
+            <button
+              onClick={() => onSelectTab('STAFF_MGMT')}
+              className={`flex w-full items-center gap-2.5 rounded px-3 py-2 transition ${
+                activeTab === 'STAFF_MGMT'
+                  ? 'bg-blue-600 text-white font-bold'
+                  : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+              }`}
+            >
+              <Users size={15} />
+              <span>직원 계정 발급</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => onSelectTab('EXPORT')}
+            className={`flex w-full items-center gap-2.5 rounded px-3 py-2 transition ${
+              activeTab === 'EXPORT'
+                ? 'bg-blue-600 text-white font-bold'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <FileSpreadsheet size={15} />
+            <span>데이터 엑스포트 (CSV)</span>
+          </button>
+
+          <button
+            onClick={() => onSelectTab('SIMULATION')}
+            className={`flex w-full items-center gap-2.5 rounded px-3 py-2 transition ${
+              activeTab === 'SIMULATION'
+                ? 'bg-blue-600 text-white font-bold'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <Terminal size={15} />
+            <span>Dev Mode</span>
+          </button>
         </nav>
       </div>
 
-      <div className="rounded border border-slate-700 bg-slate-800/80 p-3">
-        <div className="mb-0.5 flex items-center gap-1.5">
-          <UserCheck size={14} className="text-slate-400" />
-          <span className="text-xs font-semibold text-slate-100">{currentUser.staffName}</span>
+      {/* 하단 사용자 정보 및 로그아웃 */}
+      <div className="border-t border-slate-800 p-3">
+        <div className="mb-2 flex items-center justify-between text-xs">
+          <div>
+            <span className="font-bold text-white">{currentUser.staffName}</span>
+            <span className="block text-[10px] text-slate-400">{currentUser.roleDescription}</span>
+          </div>
         </div>
-        <div className="mb-2 text-[10px] text-slate-400">
-          {currentUser.roleDescription}
-        </div>
+
         <button
           onClick={onLogout}
-          className="flex w-full items-center justify-center gap-1.5 rounded border border-slate-600 bg-slate-700/80 py-1.5 text-[11px] font-medium text-slate-200 transition hover:bg-slate-600 hover:text-white"
+          className="flex w-full items-center justify-center gap-1.5 rounded border border-slate-700 bg-slate-800/60 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-700 hover:text-white"
         >
-          <LogOut size={13} /> 로그아웃
+          <LogOut size={13} />
+          <span>로그아웃</span>
         </button>
       </div>
     </aside>

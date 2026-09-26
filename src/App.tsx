@@ -9,12 +9,12 @@ import ReservationGridView from './components/ReservationGridView';
 import TagManagementView from './components/TagManagementView';
 import ExportReportView from './components/ExportReportView';
 import StaffManagementView from './components/StaffManagementView';
+import CityLedgerView from './components/CityLedgerView';
 import {
   LogIn, RefreshCw, Hotel, Clock, Plus, Trash2, ListChecks, CheckCircle2, AlertCircle
 } from 'lucide-react';
 
 export default function App() {
-  // 🚀 sessionStorage를 통해 브라우저 탭별 고유 로그인 세션 유지
   const [currentUser, setCurrentUser] = useState<LoginResponse | null>(() => {
     const saved = sessionStorage.getItem('hotel_pms_user');
     return saved ? JSON.parse(saved) : null;
@@ -26,8 +26,6 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
 
   const [businessDate, setBusinessDate] = useState('2026-09-20');
-
-  // Dev Mode 전용 체크인 인입 일자 상태 (기본값: 현재 공식 영업일자)
   const [simulationTargetDate, setSimulationTargetDate] = useState('2026-09-20');
 
   const [indicatorData, setIndicatorData] = useState<FloorMapResponseDto | null>(null);
@@ -86,7 +84,6 @@ export default function App() {
     setLoginError('');
     try {
       const data = await pmsService.login(staffId, password);
-      // 🚀 sessionStorage에 탭 전용으로 토큰과 유저 저장 (탭 간 덮어쓰기 방어)
       sessionStorage.setItem('hotel_pms_token', data.token);
       sessionStorage.setItem('hotel_pms_user', JSON.stringify(data));
       setCurrentUser(data);
@@ -185,19 +182,47 @@ export default function App() {
     }
   };
 
+  // 🚀 나이트 오딧 사전 검증 및 미체크인 이월 파이프라인 (0박 보존 & 화면 자동 갱신)
   const handleRunNightAudit = async () => {
-    if (!confirm(`[일일 야간 마감]\n${businessDate} 기준 나이트 오딧을 실행하시겠습니까?\n\n- 미체크인 당일 도착건: 노쇼 취소 및 방 반납\n- 재실 고객: 1박 숙박료 청구원장 자동 가산\n- 영업일자: 익일(+1일) 전진`)) return;
-
     setIsNightAuditing(true);
     try {
+      // 1. 당일 미체크인 도착 예정 건수 사전 점검
+      const checkResult = await pmsService.checkUncheckedArrivals(businessDate);
+
+      if (checkResult.uncheckedCount > 0) {
+        const confirmRollover = confirm(
+          `[나이트 오딧 실행 보류 알림]\n\n` +
+          `현재 영업일자(${businessDate})에 도착 예정이었으나 체크인되지 않은 예약이 ${checkResult.uncheckedCount}건 남아있습니다.\n\n` +
+          `미체크인 예약을 [내일 체크인 / 1박 차감]으로 이월하시겠습니까?\n` +
+          `* 1박 예약은 취소되지 않고 '0박 (새벽 도착 / 당일 오전 아웃)'으로 객실이 안전하게 보존됩니다.\n\n` +
+          `[확인]을 누르면 이월 처리 후 나이트 오딧이 진행됩니다.`
+        );
+
+        if (!confirmRollover) {
+          setIsNightAuditing(false);
+          return;
+        }
+
+        const rolloverRes = await pmsService.rolloverUncheckedArrivals(businessDate);
+        alert(`총 ${rolloverRes.processedCount}건의 미체크인 예약이 이월되었습니다. 나이트 오딧을 시작합니다.`);
+      }
+
+      // 2. 나이트 오딧 본 실행
       const res = await pmsService.runNightAudit(businessDate);
       const audit = res.data;
-      alert(`[마감 완료]\n- 노쇼 취소: ${audit.noShowCount}건\n- 숙박료 포스팅: ${audit.roomChargePostedCount}실 (총 ¥${audit.totalRoomRevenuePosted.toLocaleString()})\n- 신규 영업일자: ${audit.newBusinessDate}`);
+      alert(
+        `[야간 마감 완료]\n` +
+        `- 재실 룸차지 포스팅: ${audit.roomChargePostedCount}실 (총 ¥${audit.totalRoomRevenuePosted.toLocaleString()})\n` +
+        `- 공식 영업일자 전진: ${audit.newBusinessDate}`
+      );
+
+      // 화면 즉시 동기화 (로그아웃하지 않고 현재 인디케이터 리로드)
       setBusinessDate(audit.newBusinessDate);
       setSimulationTargetDate(audit.newBusinessDate);
+      setActiveDetailReservation(null);
       void fetchIndicator();
     } catch (err: any) {
-      alert('나이트 오딧 실패: ' + (err.response?.data?.message || err.message));
+      alert('나이트 오딧 차단/실패: ' + (err.response?.data?.message || err.message));
     } finally {
       setIsNightAuditing(false);
     }
@@ -213,7 +238,6 @@ export default function App() {
     setCustomRequirements((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // 실무 시인성 강화 파스텔 팔레트
   const getStatusClass = (status: RoomMatrixItemDto['status']) => {
     switch (status) {
       case 'OCCUPIED': return 'bg-[#ffe4e6] border-[#f43f5e] text-[#9f1239]';
@@ -319,7 +343,7 @@ export default function App() {
             <button
               onClick={handleRunNightAudit}
               disabled={isNightAuditing}
-              title="야간 일일 마감: 당일 노쇼 자동 취소, 재실 숙박료 정산, 영업일자 익일 롤오버"
+              title="야간 일일 마감: 미체크인 예약 익일 이월(0박/1박 차감) 후 재실 룸차지 포스팅 및 영업일자 전진"
               className={`flex items-center gap-1 rounded border border-rose-300 px-2.5 py-0.5 text-xs font-semibold transition ${
                 isNightAuditing ? 'cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
               }`}
@@ -381,7 +405,7 @@ export default function App() {
                   {indicatorData && (
                     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-slate-300 bg-slate-200/60 p-1.5 shadow-xs">
                       
-                      {/* 가로 상단 호수 축 헤더 */}
+                      {/* 가로 축 호수 헤더 */}
                       <div className="flex items-center gap-1 pb-1 border-b border-slate-300/80 mb-1">
                         <div className="w-10 min-w-[40px] text-center text-[10px] font-bold text-slate-500 uppercase">
                           층 / 호
@@ -520,7 +544,8 @@ export default function App() {
 
               {/* 5. 직원 계정 발급 탭 */}
               {activeTab === 'STAFF_MGMT' && <StaffManagementView />}
-
+              {activeTab === 'CITY_LEDGER' && <CityLedgerView />}
+              
               {/* 6. 데이터 엑스포트 탭 */}
               {activeTab === 'EXPORT' && <ExportReportView businessDate={businessDate} />}
 
@@ -625,7 +650,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 우측: 시나리오 시뮬레이터 실행 패널 */}
+                    {/* 우측: 시나리오 제어 패널 */}
                     <div className="flex flex-col gap-2.5 rounded border border-slate-300 bg-white p-4 shadow-2xs">
                       <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                         <h3 className="text-xs font-bold text-slate-900">시나리오 인입 및 초기화 제어</h3>

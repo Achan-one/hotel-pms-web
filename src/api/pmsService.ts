@@ -6,6 +6,35 @@ export interface TagPreferenceDto {
   avoidTags: string[];
 }
 
+export interface FolioTransactionDto {
+  transactionId: string;
+  timestamp: string;
+  type: 'CHARGE' | 'PAYMENT';
+  category: string;
+  description: string;
+  amount: number;
+}
+
+export interface FolioChargeCodeDto {
+  code: string;
+  name: string;
+  defaultAmount: number;
+  isSystemDefault: boolean;
+}
+
+export interface CityLedgerRecordDto {
+  id: number;
+  channelType: string;
+  reservationId: string;
+  guestName: string;
+  channelReservationNo: string;
+  checkInDate: string;
+  checkOutDate: string;
+  billedAmount: number;
+  settledDate: string;
+  createdAt: string;
+}
+
 export interface ReservationDetailDto {
   reservationId: string;
   originalGuestName?: string;
@@ -40,6 +69,16 @@ export interface ReservationDetailDto {
     channelType: string;
     channelReservationNo: string;
     planName: string;
+  };
+
+  dailyRates?: Record<string, number>;
+  transactions?: FolioTransactionDto[];
+  paymentLedger?: {
+    paymentType: string;
+    totalCharges: number;
+    totalPayments: number;
+    balance: number;
+    settled: boolean;
   };
 }
 
@@ -95,7 +134,6 @@ export const pmsService = {
     return res.data.data;
   },
 
-  // 관리자 전용 직원 계정 발급 (ROLE_ADMIN 전용)
   createStaff: async (data: CreateStaffRequest) => {
     const res = await apiClient.post<ApiResponse<void>>('/api/admin/staff', data);
     return res.data;
@@ -122,6 +160,45 @@ export const pmsService = {
 
   getReservationDetail: async (reservationId: string): Promise<ReservationDetailDto> => {
     const res = await apiClient.get<ApiResponse<ReservationDetailDto>>(`/api/reservations/${reservationId}`);
+    return res.data.data;
+  },
+
+  // 일자별 요금 스케줄 갱신
+  updateDailyRates: async (reservationId: string, dailyRates: Record<string, number>) => {
+    const res = await apiClient.put<ApiResponse<void>>(
+      `/api/reservations/${reservationId}/daily-rates`,
+      { dailyRates }
+    );
+    return res.data;
+  },
+
+  // 🔒 편집 락 (Lock) API
+  acquireLock: async (
+    reservationId: string,
+    staffId: string,
+    staffName: string
+  ): Promise<{ isLockedByOther: boolean; lockedByStaffName: string }> => {
+    const res = await apiClient.post<ApiResponse<{ isLockedByOther: boolean; lockedByStaffName: string }>>(
+      `/api/reservations/${reservationId}/lock`,
+      { staffId, staffName }
+    );
+    return res.data.data;
+  },
+
+  releaseLock: async (reservationId: string, staffId: string) => {
+    try {
+      await apiClient.delete(`/api/reservations/${reservationId}/lock`, {
+        params: { staffId },
+      });
+    } catch {
+      // unmount 시 에러 무시
+    }
+  },
+
+  checkLock: async (reservationId: string): Promise<{ isLockedByOther: boolean; lockedByStaffName: string }> => {
+    const res = await apiClient.get<ApiResponse<{ isLockedByOther: boolean; lockedByStaffName: string }>>(
+      `/api/reservations/${reservationId}/lock`
+    );
     return res.data.data;
   },
 
@@ -178,7 +255,73 @@ export const pmsService = {
     return res.data;
   },
 
-  // 나이트 오딧 (야간 일일 마감)
+  // 🚀 원장 수납/청구 거래 등록 API (복식 분개 지원)
+  addFolioTransaction: async (reservationId: string, data: {
+    type: 'PAYMENT' | 'CHARGE';
+    paymentMethod?: string;
+    category?: string;
+    description: string;
+    amount: number;
+    instantChargeCategory?: string;
+    instantChargeDescription?: string;
+  }) => {
+    const res = await apiClient.post<ApiResponse<void>>(`/api/reservations/${reservationId}/folio/transactions`, data);
+    return res.data;
+  },
+
+  // 🚀 표준 계정과목 카탈로그 API
+  getChargeCodes: async (): Promise<FolioChargeCodeDto[]> => {
+    const res = await apiClient.get<ApiResponse<FolioChargeCodeDto[]>>('/api/accounting/charge-codes');
+    return res.data.data;
+  },
+
+  registerChargeCode: async (code: string, name: string, defaultAmount: number) => {
+    const res = await apiClient.post<ApiResponse<void>>('/api/accounting/charge-codes', {
+      code,
+      name,
+      defaultAmount,
+    });
+    return res.data;
+  },
+
+  deleteChargeCode: async (code: string) => {
+    const res = await apiClient.delete<ApiResponse<void>>(`/api/accounting/charge-codes/${code}`);
+    return res.data;
+  },
+
+  // 🚀 OTA City Ledger 정산 총액 및 명세서 조회 API
+  getCityLedgerSummary: async (): Promise<{
+    records: CityLedgerRecordDto[];
+    channelTotals: Record<string, number>;
+    grandTotal: number;
+  }> => {
+    const res = await apiClient.get<ApiResponse<{
+      records: CityLedgerRecordDto[];
+      channelTotals: Record<string, number>;
+      grandTotal: number;
+    }>>('/api/accounting/city-ledger');
+    return res.data.data;
+  },
+
+  // 나이트 오딧 사전 검증: 당일 미체크인 도착 예정 건수 확인
+  checkUncheckedArrivals: async (targetDate: string): Promise<{ targetDate: string; uncheckedCount: number; canRunAudit: boolean }> => {
+    const res = await apiClient.get<ApiResponse<{ targetDate: string; uncheckedCount: number; canRunAudit: boolean }>>(
+      '/api/system/unchecked-arrivals',
+      { params: { targetDate } }
+    );
+    return res.data.data;
+  },
+
+  // 미체크인 예약 익일 일괄 이월 및 1박 차감 (0박 보존)
+  rolloverUncheckedArrivals: async (targetDate: string): Promise<{ processedCount: number }> => {
+    const res = await apiClient.post<ApiResponse<{ processedCount: number }>>(
+      '/api/system/rollover-unchecked-arrivals',
+      null,
+      { params: { targetDate } }
+    );
+    return res.data.data;
+  },
+
   runNightAudit: async (targetDate: string): Promise<ApiResponse<NightAuditResultDto>> => {
     const res = await apiClient.post<ApiResponse<NightAuditResultDto>>('/api/reservations/night-audit', null, {
       params: { targetDate },
@@ -186,7 +329,6 @@ export const pmsService = {
     return res.data;
   },
 
-  // 🎲 기준일자 기반 50명 동적 시드 생성
   generateDynamicTestData: async (baseDate: string): Promise<ApiResponse<string>> => {
     const res = await apiClient.post<ApiResponse<string>>('/api/reservations/generate-test-data', null, {
       params: { baseDate },
@@ -194,7 +336,6 @@ export const pmsService = {
     return res.data;
   },
 
-  // 🚀 [보정] 영업일자를 쿼리 파라미터로 함께 전송하여 날짜 불일치 방어
   seedSampleReservations: async (targetDate?: string) => {
     const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/seed-samples', null, {
       params: targetDate ? { targetDate } : {},
@@ -218,6 +359,7 @@ export const pmsService = {
   bulkSimulate50And30: async (customNotes?: string[], targetDate?: string) => {
     const res = await apiClient.post<ApiResponse<unknown>>('/api/simulation/bulk-simulate-50-and-30', {
       customNotes: customNotes || [],
+      targetDate: targetDate || undefined,
     }, {
       params: targetDate ? { targetDate } : {},
     });
@@ -231,6 +373,14 @@ export const pmsService = {
   clearAllSimulationData: async () => {
     return pmsService.clearReservations();
   },
+
+  resetAllSettings: async (): Promise<{ success: boolean; businessDate: string; message: string }> => {
+    const res = await apiClient.post<ApiResponse<{ success: boolean; businessDate: string; message: string }>>(
+      '/api/simulation/reset-all-settings'
+    );
+    return res.data.data;
+  },
+
   updateOperationalTags: async (reservationId: string, data: { preferredTags: string[]; avoidTags: string[] }) => {
     const res = await apiClient.patch<ApiResponse<void>>(`/api/reservations/${reservationId}/operational-tags`, data);
     return res.data;
@@ -274,53 +424,14 @@ export const pmsService = {
     triggerFileDownload(res.data, '태그별_보유객실매핑_매트릭스.csv');
   },
 
-  // 서버 DB의 공식 영업일자 조회
   getSystemBusinessDate: async (): Promise<string> => {
     const res = await apiClient.get<ApiResponse<{ businessDate: string }>>('/api/system/business-date');
     return res.data.data.businessDate;
   },
 
-  // 서버 DB 공식 영업일자 수동 보정
   setSystemBusinessDate: async (businessDate: string): Promise<string> => {
     const res = await apiClient.put<ApiResponse<{ businessDate: string }>>('/api/system/business-date', { businessDate });
     return res.data.data.businessDate;
-  },
-
-  // 🔒 편집 락 (Lock) API
-  acquireLock: async (
-    reservationId: string,
-    staffId: string,
-    staffName: string
-  ): Promise<{ isLockedByOther: boolean; lockedByStaffName: string }> => {
-    const res = await apiClient.post<ApiResponse<{ isLockedByOther: boolean; lockedByStaffName: string }>>(
-      `/api/reservations/${reservationId}/lock`,
-      { staffId, staffName }
-    );
-    return res.data.data;
-  },
-
-  releaseLock: async (reservationId: string, staffId: string) => {
-    try {
-      await apiClient.delete(`/api/reservations/${reservationId}/lock`, {
-        params: { staffId },
-      });
-    } catch {
-      // unmount 시 에러 무시
-    }
-  },
-
-  checkLock: async (reservationId: string): Promise<{ isLockedByOther: boolean; lockedByStaffName: string }> => {
-    const res = await apiClient.get<ApiResponse<{ isLockedByOther: boolean; lockedByStaffName: string }>>(
-      `/api/reservations/${reservationId}/lock`
-    );
-    return res.data.data;
-  },
-  // 모든 설정 및 데이터 완벽 초기화 (Full Reset)
-  resetAllSettings: async (): Promise<{ success: boolean; businessDate: string; message: string }> => {
-    const res = await apiClient.post<ApiResponse<{ success: boolean; businessDate: string; message: string }>>(
-      '/api/simulation/reset-all-settings'
-    );
-    return res.data.data;
   },
 };
 
