@@ -20,7 +20,7 @@ export default function Sidebar({ currentUser, activeTab, onSelectTab, onLogout 
     { id: 'TAGS', label: '태그 사전 관리', icon: Tag },
     { id: 'STAFF_MGMT', label: '직원 계정 발급', icon: UserPlus, adminOnly: true },
     { id: 'EXPORT', label: '데이터 엑스포트 (CSV)', icon: FileDown },
-    { id: 'SIMULATION', label: '채널 매니저 연동 랩', icon: Beaker },
+    { id: 'SIMULATION', label: 'Dev Mode', icon: Beaker },
   ];
 
   return (

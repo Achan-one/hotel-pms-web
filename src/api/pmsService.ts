@@ -285,6 +285,43 @@ export const pmsService = {
     const res = await apiClient.put<ApiResponse<{ businessDate: string }>>('/api/system/business-date', { businessDate });
     return res.data.data.businessDate;
   },
+
+  // 🔒 편집 락 (Lock) API
+  acquireLock: async (
+    reservationId: string,
+    staffId: string,
+    staffName: string
+  ): Promise<{ isLockedByOther: boolean; lockedByStaffName: string }> => {
+    const res = await apiClient.post<ApiResponse<{ isLockedByOther: boolean; lockedByStaffName: string }>>(
+      `/api/reservations/${reservationId}/lock`,
+      { staffId, staffName }
+    );
+    return res.data.data;
+  },
+
+  releaseLock: async (reservationId: string, staffId: string) => {
+    try {
+      await apiClient.delete(`/api/reservations/${reservationId}/lock`, {
+        params: { staffId },
+      });
+    } catch {
+      // unmount 시 에러 무시
+    }
+  },
+
+  checkLock: async (reservationId: string): Promise<{ isLockedByOther: boolean; lockedByStaffName: string }> => {
+    const res = await apiClient.get<ApiResponse<{ isLockedByOther: boolean; lockedByStaffName: string }>>(
+      `/api/reservations/${reservationId}/lock`
+    );
+    return res.data.data;
+  },
+  // 모든 설정 및 데이터 완벽 초기화 (Full Reset)
+  resetAllSettings: async (): Promise<{ success: boolean; businessDate: string; message: string }> => {
+    const res = await apiClient.post<ApiResponse<{ success: boolean; businessDate: string; message: string }>>(
+      '/api/simulation/reset-all-settings'
+    );
+    return res.data.data;
+  },
 };
 
 export default pmsService;

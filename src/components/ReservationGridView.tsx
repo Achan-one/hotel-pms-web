@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ReservationDetailDto } from '../api/pmsService';
 import { pmsService } from '../api/pmsService';
 import apiClient from '../api/client';
 import {
-  Search, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Tag as TagIcon, X, Globe
+  Search, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Tag as TagIcon, X, Globe, AlertCircle
 } from 'lucide-react';
 
 interface Props {
@@ -44,6 +44,56 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
   const [sortField, setSortField] = useState<SortField>(savedState.sortField ?? 'roomNumber');
   const [sortOrder, setSortOrder] = useState<SortOrder>(savedState.sortOrder ?? 'asc');
 
+  // 4. 컬럼 너비 동적 조절 상태
+  const [colWidths, setColWidths] = useState({
+    roomNumber: 75,
+    status: 90,
+    channel: 110,
+    reservationId: 130,
+    guestName: 140,
+    roomType: 140,
+    checkInDate: 110,
+    stayNights: 65,
+    memo: 360,
+  });
+
+  const resizingRef = useRef<{ col: keyof typeof colWidths; startX: number; startW: number } | null>(null);
+
+  const handleMouseDownResize = (e: React.MouseEvent, col: keyof typeof colWidths) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizingRef.current = { col, startX: e.clientX, startW: colWidths[col] };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = moveEvent.clientX - resizingRef.current.startX;
+      const nextWidth = Math.max(50, resizingRef.current.startW + delta);
+      setColWidths((prev) => ({ ...prev, [resizingRef.current!.col]: nextWidth }));
+    };
+
+    const handleMouseUp = () => {
+      resizingRef.current = null;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // 1. 최소 검색 조건 입력 여부 판별
+  const hasValidSearchCondition = useMemo(() => {
+    return Boolean(
+      searchGuestName.trim() ||
+      searchReservationId.trim() ||
+      searchCheckInDate ||
+      searchStayingDate ||
+      searchStatus ||
+      searchTag.trim() ||
+      searchOta
+    );
+  }, [searchGuestName, searchReservationId, searchCheckInDate, searchStayingDate, searchStatus, searchTag, searchOta]);
+
   useEffect(() => {
     sessionStorage.setItem(GRID_STATE_SESSION_KEY, JSON.stringify({
       guestName: searchGuestName,
@@ -76,6 +126,17 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
     tagVal = searchTag,
     otaVal = searchOta
   ) => {
+    const hasCondition = Boolean(
+      gName.trim() || rId.trim() || cDate || sDate || stat || tagVal.trim() || otaVal
+    );
+
+    // 조건이 전혀 없으면 검색을 차단하고 목록을 비움
+    if (!hasCondition) {
+      setReservationList([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const list = await pmsService.getReservations({
@@ -236,7 +297,7 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-300">
         <div className="flex">
           {[
-            { label: '전체', active: !searchCheckInDate && !searchStayingDate && !searchStatus, onClick: () => { setSearchCheckInDate(''); setSearchStayingDate(''); setSearchStatus(''); void executeSearch(searchGuestName, searchReservationId, '', '', '', searchTag, searchOta); } },
+            { label: '전체 초기화', active: false, onClick: () => { setSearchCheckInDate(''); setSearchStayingDate(''); setSearchStatus(''); void executeSearch(searchGuestName, searchReservationId, '', '', '', searchTag, searchOta); } },
             { label: '당일 도착', active: searchCheckInDate === businessDate, onClick: () => { const nCI = searchCheckInDate === businessDate ? '' : businessDate; setSearchCheckInDate(nCI); setSearchStayingDate(''); setSearchStatus(''); void executeSearch(searchGuestName, searchReservationId, nCI, '', '', searchTag, searchOta); } },
             { label: '현재 재실', active: searchStatus === 'CHECKED_IN', onClick: () => { const nStay = searchStayingDate === businessDate ? '' : businessDate; const nStat = searchStatus === 'CHECKED_IN' ? '' : 'CHECKED_IN'; setSearchStayingDate(nStay); setSearchCheckInDate(''); setSearchStatus(nStat); void executeSearch(searchGuestName, searchReservationId, '', nStay, nStat, searchTag, searchOta); } },
             { label: '배정 완료', active: searchStatus === 'ASSIGNED', onClick: () => { const nStat = searchStatus === 'ASSIGNED' ? '' : 'ASSIGNED'; setSearchStatus(nStat); setSearchCheckInDate(''); setSearchStayingDate(''); void executeSearch(searchGuestName, searchReservationId, '', '', nStat, searchTag, searchOta); } },
@@ -399,53 +460,111 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
         </div>
       </div>
 
-      {/* 4. 데이터 그리드 테이블 (예약 채널 열 신설) */}
+      {/* 4. 데이터 그리드 테이블 */}
       <div className="overflow-hidden rounded border border-slate-300 bg-white shadow-2xs">
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3.5 py-1.5">
           <span className="text-xs font-medium text-slate-600">
             조회 결과: <b className="font-bold text-slate-900">{filteredAndSortedList.length}</b>건
           </span>
           <span className="text-[11px] text-slate-400">
-            채널 및 요청사항 독립 색인 적용 중
+            * 항목 줄을 직접 클릭하면 상세 편집 창으로 진입합니다. (헤더 경계선을 드래그하여 열 너비 조절 가능)
           </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-xs whitespace-nowrap">
+          <table className="w-full border-collapse text-left text-xs whitespace-nowrap table-fixed">
             <thead>
               <tr className="border-b border-slate-300 bg-slate-100 text-slate-700 select-none">
-                <th onClick={() => handleSort('roomNumber')} className="w-20 cursor-pointer px-3 py-2 hover:bg-slate-200">
-                  <div className="flex items-center gap-1 font-bold">호실 {renderSortIcon('roomNumber')}</div>
+                
+                {/* 1. 호실 */}
+                <th style={{ width: colWidths.roomNumber }} className="relative px-3 py-2 cursor-pointer hover:bg-slate-200">
+                  <div onClick={() => handleSort('roomNumber')} className="flex items-center gap-1 font-bold">
+                    호실 {renderSortIcon('roomNumber')}
+                  </div>
+                  <div onMouseDown={(e) => handleMouseDownResize(e, 'roomNumber')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
                 </th>
-                <th onClick={() => handleSort('status')} className="w-24 cursor-pointer px-3 py-2 hover:bg-slate-200">
-                  <div className="flex items-center gap-1 font-bold">상태 {renderSortIcon('status')}</div>
+
+                {/* 2. 상태 */}
+                <th style={{ width: colWidths.status }} className="relative px-3 py-2 cursor-pointer hover:bg-slate-200">
+                  <div onClick={() => handleSort('status')} className="flex items-center gap-1 font-bold">
+                    상태 {renderSortIcon('status')}
+                  </div>
+                  <div onMouseDown={(e) => handleMouseDownResize(e, 'status')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
                 </th>
-                <th onClick={() => handleSort('channel')} className="w-28 cursor-pointer px-3 py-2 hover:bg-slate-200">
-                  <div className="flex items-center gap-1 font-bold"><Globe size={11} /> 예약 채널 {renderSortIcon('channel')}</div>
+
+                {/* 3. 예약 채널 */}
+                <th style={{ width: colWidths.channel }} className="relative px-3 py-2 cursor-pointer hover:bg-slate-200">
+                  <div onClick={() => handleSort('channel')} className="flex items-center gap-1 font-bold">
+                    <Globe size={11} /> 예약 채널 {renderSortIcon('channel')}
+                  </div>
+                  <div onMouseDown={(e) => handleMouseDownResize(e, 'channel')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
                 </th>
-                <th onClick={() => handleSort('reservationId')} className="w-32 cursor-pointer px-3 py-2 hover:bg-slate-200">
-                  <div className="flex items-center gap-1 font-bold">예약ID {renderSortIcon('reservationId')}</div>
+
+                {/* 4. 예약 ID */}
+                <th style={{ width: colWidths.reservationId }} className="relative px-3 py-2 cursor-pointer hover:bg-slate-200">
+                  <div onClick={() => handleSort('reservationId')} className="flex items-center gap-1 font-bold">
+                    예약ID {renderSortIcon('reservationId')}
+                  </div>
+                  <div onMouseDown={(e) => handleMouseDownResize(e, 'reservationId')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
                 </th>
-                <th onClick={() => handleSort('guestName')} className="w-36 cursor-pointer px-3 py-2 hover:bg-slate-200">
-                  <div className="flex items-center gap-1 font-bold">고객 성명 {renderSortIcon('guestName')}</div>
+
+                {/* 5. 고객 성명 */}
+                <th style={{ width: colWidths.guestName }} className="relative px-3 py-2 cursor-pointer hover:bg-slate-200">
+                  <div onClick={() => handleSort('guestName')} className="flex items-center gap-1 font-bold">
+                    고객 성명 {renderSortIcon('guestName')}
+                  </div>
+                  <div onMouseDown={(e) => handleMouseDownResize(e, 'guestName')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
                 </th>
-                <th className="w-32 px-3 py-2 font-bold">계약 룸타입</th>
-                <th onClick={() => handleSort('checkInDate')} className="w-28 cursor-pointer px-3 py-2 hover:bg-slate-200">
-                  <div className="flex items-center gap-1 font-bold">체크인 {renderSortIcon('checkInDate')}</div>
+
+                {/* 6. 계약 룸타입 */}
+                <th style={{ width: colWidths.roomType }} className="relative px-3 py-2 font-bold">
+                  <div>계약 룸타입</div>
+                  <div onMouseDown={(e) => handleMouseDownResize(e, 'roomType')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
                 </th>
-                <th onClick={() => handleSort('stayNights')} className="w-16 cursor-pointer px-3 py-2 text-center hover:bg-slate-200">
-                  <div className="flex items-center justify-center gap-1 font-bold">박수 {renderSortIcon('stayNights')}</div>
+
+                {/* 7. 체크인 */}
+                <th style={{ width: colWidths.checkInDate }} className="relative px-3 py-2 cursor-pointer hover:bg-slate-200">
+                  <div onClick={() => handleSort('checkInDate')} className="flex items-center gap-1 font-bold">
+                    체크인 {renderSortIcon('checkInDate')}
+                  </div>
+                  <div onMouseDown={(e) => handleMouseDownResize(e, 'checkInDate')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
                 </th>
-                <th className="px-3 py-2 font-bold">고객 요청 메모 및 AI 태그</th>
-                <th className="w-16 px-3 py-2 text-center font-bold">제어</th>
+
+                {/* 8. 박수 */}
+                <th style={{ width: colWidths.stayNights }} className="relative px-3 py-2 text-center cursor-pointer hover:bg-slate-200">
+                  <div onClick={() => handleSort('stayNights')} className="flex items-center justify-center gap-1 font-bold">
+                    박수 {renderSortIcon('stayNights')}
+                  </div>
+                  <div onMouseDown={(e) => handleMouseDownResize(e, 'stayNights')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
+                </th>
+
+                {/* 9. 고객 요청 메모 및 AI 태그 */}
+                <th style={{ width: colWidths.memo }} className="relative px-3 py-2 font-bold">
+                  <div>고객 요청 메모 및 AI 태그</div>
+                  <div onMouseDown={(e) => handleMouseDownResize(e, 'memo')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filteredAndSortedList.length === 0 ? (
+              {/* 아무 조건도 선택되지 않은 상태 */}
+              {!hasValidSearchCondition ? (
                 <tr>
-                  <td colSpan={10} className="p-12 text-center text-slate-400">
-                    <Search size={22} className="mx-auto mb-1 block opacity-30" />
-                    일치하는 예약 내역이 없습니다.
+                  <td colSpan={9} className="p-16 text-center text-slate-500">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-3 border border-slate-300">
+                      <AlertCircle size={26} />
+                    </div>
+                    <p className="text-sm font-bold text-slate-800">검색이 시작되지 않음</p>
+                    <p className="text-xs text-slate-500 mt-1.5">
+                      수십만 건의 대용량 예약 조회로 인한 시스템 부하를 방지하기 위해 전체 조회가 차단되어 있습니다.<br />
+                      상단 검색창에 <b>성명, 예약ID</b>를 입력하거나 <b>상태, 채널, 일자</b>를 선택해 주세요.
+                    </p>
+                  </td>
+                </tr>
+              ) : filteredAndSortedList.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="p-14 text-center text-slate-400">
+                    <Search size={24} className="mx-auto mb-1.5 block opacity-30" />
+                    지정한 조건과 일치하는 예약 내역이 없습니다.
                   </td>
                 </tr>
               ) : (
@@ -453,22 +572,26 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
                   const pref = res.tagPreference?.preferredTags || [];
                   const avoid = res.tagPreference?.avoidTags || [];
 
-                  // 인계 메모에서 [OTA] 프리픽스를 제외한 순수 고객 요청 텍스트 추출
                   let cleanNote = res.rawRequestText || '';
                   if (!cleanNote && res.internalStaffMemo) {
                     cleanNote = res.internalStaffMemo.replace(/^\[.*?\]\s*/, '');
                   }
 
                   return (
-                    <tr key={res.reservationId} className="border-b border-slate-200 hover:bg-slate-50">
+                    <tr
+                      key={res.reservationId}
+                      onClick={() => onSelectReservation(res)}
+                      title="클릭하여 예약 상세 및 편집 열기"
+                      className="cursor-pointer border-b border-slate-200 transition hover:bg-blue-50/80 active:bg-blue-100"
+                    >
                       <td className={`px-3 py-2 font-mono font-bold ${res.assignedRoomNumber ? 'text-blue-700' : 'text-slate-400'}`}>
                         {res.assignedRoomNumber ? `${res.assignedRoomNumber}호` : '-'}
                       </td>
                       <td className="px-3 py-2">{getStatusBadge(res.status)}</td>
                       <td className="px-3 py-2">{getOtaBadge(res.channelInfo?.channelType)}</td>
                       <td className="px-3 py-2 font-mono text-slate-600">{res.reservationId}</td>
-                      <td className="px-3 py-2 font-semibold text-slate-900">{res.operationalGuestName || res.guestName}</td>
-                      <td className="px-3 py-2 text-slate-600">{res.roomType || res.bookedRoomType}</td>
+                      <td className="px-3 py-2 font-semibold text-slate-900 truncate">{res.operationalGuestName || res.guestName}</td>
+                      <td className="px-3 py-2 text-slate-600 truncate">{res.roomType || res.bookedRoomType}</td>
                       <td className="px-3 py-2 text-slate-600">{res.checkInDate}</td>
                       <td className="px-3 py-2 text-center font-medium text-slate-800">{res.stayNights}박</td>
                       <td className="px-3 py-2">
@@ -492,14 +615,6 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
                             <span className="text-slate-400">-</span>
                           )}
                         </div>
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <button
-                          onClick={() => onSelectReservation(res)}
-                          className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-100"
-                        >
-                          열기
-                        </button>
                       </td>
                     </tr>
                   );

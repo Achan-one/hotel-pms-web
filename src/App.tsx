@@ -14,8 +14,9 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  // 🚀 sessionStorage를 통해 브라우저 탭별 고유 로그인 세션 유지
   const [currentUser, setCurrentUser] = useState<LoginResponse | null>(() => {
-    const saved = localStorage.getItem('hotel_pms_user');
+    const saved = sessionStorage.getItem('hotel_pms_user');
     return saved ? JSON.parse(saved) : null;
   });
 
@@ -25,6 +26,9 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
 
   const [businessDate, setBusinessDate] = useState('2026-09-20');
+
+  // Dev Mode 전용 체크인 인입 일자 상태 (기본값: 현재 공식 영업일자)
+  const [simulationTargetDate, setSimulationTargetDate] = useState('2026-09-20');
 
   const [indicatorData, setIndicatorData] = useState<FloorMapResponseDto | null>(null);
   const [indicatorLoading, setIndicatorLoading] = useState(false);
@@ -82,8 +86,9 @@ export default function App() {
     setLoginError('');
     try {
       const data = await pmsService.login(staffId, password);
-      localStorage.setItem('hotel_pms_token', data.token);
-      localStorage.setItem('hotel_pms_user', JSON.stringify(data));
+      // 🚀 sessionStorage에 탭 전용으로 토큰과 유저 저장 (탭 간 덮어쓰기 방어)
+      sessionStorage.setItem('hotel_pms_token', data.token);
+      sessionStorage.setItem('hotel_pms_user', JSON.stringify(data));
       setCurrentUser(data);
       navigateTo('INDICATOR', null);
     } catch (err: unknown) {
@@ -95,8 +100,8 @@ export default function App() {
   };
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('hotel_pms_token');
-    localStorage.removeItem('hotel_pms_user');
+    sessionStorage.removeItem('hotel_pms_token');
+    sessionStorage.removeItem('hotel_pms_user');
     setCurrentUser(null);
     setIndicatorData(null);
     setActiveDetailReservation(null);
@@ -114,7 +119,10 @@ export default function App() {
     if (!currentUser) return;
     pmsService.getSystemBusinessDate()
       .then((serverDate) => {
-        if (serverDate) setBusinessDate(serverDate);
+        if (serverDate) {
+          setBusinessDate(serverDate);
+          setSimulationTargetDate(serverDate);
+        }
       })
       .catch((err) => console.error('시스템 영업일자 조회 실패:', err));
   }, [currentUser]);
@@ -140,6 +148,7 @@ export default function App() {
 
   const handleBusinessDateChange = async (newDate: string) => {
     setBusinessDate(newDate);
+    setSimulationTargetDate(newDate);
     try {
       await pmsService.setSystemBusinessDate(newDate);
     } catch (err) {
@@ -185,6 +194,7 @@ export default function App() {
       const audit = res.data;
       alert(`[마감 완료]\n- 노쇼 취소: ${audit.noShowCount}건\n- 숙박료 포스팅: ${audit.roomChargePostedCount}실 (총 ¥${audit.totalRoomRevenuePosted.toLocaleString()})\n- 신규 영업일자: ${audit.newBusinessDate}`);
       setBusinessDate(audit.newBusinessDate);
+      setSimulationTargetDate(audit.newBusinessDate);
       void fetchIndicator();
     } catch (err: any) {
       alert('나이트 오딧 실패: ' + (err.response?.data?.message || err.message));
@@ -514,26 +524,25 @@ export default function App() {
               {/* 6. 데이터 엑스포트 탭 */}
               {activeTab === 'EXPORT' && <ExportReportView businessDate={businessDate} />}
 
-              {/* 7. CMS 연동 테스트 랩 (0번 삭제 및 기본 6건+커스텀 풀 완성) */}
+              {/* 7. Dev Mode (개발자 전용 테스트 랩) */}
               {activeTab === 'SIMULATION' && (
                 <div className="flex w-full flex-col gap-3 font-sans text-slate-800">
-                  {/* 상단 안내 배너 */}
                   <div className="flex items-center justify-between rounded border border-slate-300 bg-white p-4 shadow-2xs">
                     <div>
-                      <h2 className="text-sm font-bold text-slate-900">OTA & 채널 매니저(CMS) 전문 연동 테스트 랩</h2>
-                      <p className="text-xs text-slate-500">
-                        TL-Lincoln 및 ONDA 인입 가상 전문을 주입하여 규칙 기반 배정 및 Gemini 2.5 Flash 태그 분석 엔진을 검증합니다[cite: 5, 7].
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-bold text-slate-900">Dev Mode (개발 및 연동 검증 랩)</h2>
+                        <span className="rounded border border-amber-300 bg-amber-50 px-2 py-0.5 font-mono text-[10px] font-bold text-amber-800">
+                          DEVELOPMENT ONLY
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        개발 및 테스트 목적으로 가상 예약을 인입하고, 대량 배치 파싱 및 초기화를 수행하는 개발자 전용 콘솔입니다.
                       </p>
                     </div>
-                    <span className="rounded border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-xs font-bold text-blue-700">
-                      CMS Sandbox Mode
-                    </span>
                   </div>
 
-                  {/* 2열 레이아웃: 좌측(요구사항 인입 풀) / 우측(배치 시나리오 제어) */}
                   <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    
-                    {/* 좌측: 고객 요청사항 인입 콘솔 */}
+                    {/* 좌측: 고객 요청사항 인입 풀 */}
                     <div className="flex flex-col gap-2.5 rounded border border-slate-300 bg-white p-4 shadow-2xs">
                       <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                         <div className="flex items-center gap-2">
@@ -570,7 +579,6 @@ export default function App() {
                       </div>
 
                       <div className="flex max-h-[360px] flex-col gap-1.5 overflow-y-auto rounded border border-slate-200 bg-slate-50/70 p-2">
-                        {/* 기본 탑재 시스템 메모 6건 */}
                         <div className="text-[10px] font-bold text-slate-400 px-1 pt-1">
                           [기본 탑재 시스템 메모 6건]
                         </div>
@@ -591,7 +599,6 @@ export default function App() {
                           </div>
                         ))}
 
-                        {/* 사용자가 추가한 커스텀 메모 */}
                         {customRequirements.length > 0 && (
                           <>
                             <div className="text-[10px] font-bold text-blue-700 px-1 pt-2 border-t border-slate-200 mt-1">
@@ -618,71 +625,115 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 우측: 시나리오 시뮬레이터 실행 패널 (영업일자 파라미터 연동) */}
+                    {/* 우측: 시나리오 시뮬레이터 실행 패널 */}
                     <div className="flex flex-col gap-2.5 rounded border border-slate-300 bg-white p-4 shadow-2xs">
                       <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                        <h3 className="text-xs font-bold text-slate-900">시뮬레이션 시나리오 트리거</h3>
-                        <span className="text-[11px] text-slate-400">DB 실시간 반영</span>
+                        <h3 className="text-xs font-bold text-slate-900">시나리오 인입 및 초기화 제어</h3>
+                        <span className="text-[11px] text-slate-400">DB 실시간 누적 반영</span>
                       </div>
 
-                      {/* 시나리오 1 */}
+                      {/* 시나리오 1: 5건 샘플 추가 */}
                       <div className="flex items-center justify-between rounded border border-slate-200 bg-slate-50/70 p-3">
                         <div>
-                          <h4 className="text-xs font-bold text-slate-900">1. 기본 검증용 샘플 데이터 주입 (5건)</h4>
+                          <h4 className="text-xs font-bold text-slate-900">1. 기본 검증용 샘플 데이터 추가 주입 (5건)</h4>
                           <p className="text-[11px] text-slate-500">
-                            현재 영업일자({businessDate}) 기준 정적 샘플 5건 즉시 적재[cite: 7]
+                            영업일자({businessDate}) 기준 샘플 예약 5건을 기존 원장에 누적 추가합니다.
                           </p>
                         </div>
                         <button
                           onClick={async () => {
                             await pmsService.seedSampleReservations(businessDate);
-                            alert(`영업일자(${businessDate}) 기준 샘플 데이터 5건 주입 완료`);
+                            alert(`영업일자(${businessDate}) 기준 샘플 데이터 5건 추가 적재 완료`);
                             void fetchIndicator();
                           }}
                           className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-100"
                         >
-                          데이터 주입
+                          + 5건 추가
                         </button>
                       </div>
 
-                      {/* 시나리오 2 */}
-                      <div className="flex items-center justify-between rounded border border-blue-200 bg-blue-50/60 p-3">
+                      {/* 시나리오 2: 날짜 선택 가능한 50건 누적 인입 */}
+                      <div className="flex flex-col gap-2 rounded border border-blue-200 bg-blue-50/60 p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-xs font-bold text-blue-900">2. 신규 예약 50건 대량 인입 (누적 추가)</h4>
+                            <p className="text-[11px] text-blue-700">
+                              이전 예약을 삭제하지 않고 지정한 체크인 일자로 50건을 누적 추가합니다.
+                            </p>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              const res: any = await pmsService.bulkSimulate50And30(customRequirements, simulationTargetDate);
+                              alert(res.message || `${simulationTargetDate} 기준 50건 인입 완료`);
+                              void fetchIndicator();
+                            }}
+                            className="rounded bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700"
+                          >
+                            + 50건 인입 실행
+                          </button>
+                        </div>
+
+                        {/* 인입 날짜 선택 인풋 */}
+                        <div className="flex items-center gap-2 border-t border-blue-200/60 pt-2 text-xs">
+                          <span className="font-semibold text-blue-950">인입 체크인 일자:</span>
+                          <input
+                            type="date"
+                            value={simulationTargetDate}
+                            onChange={(e) => setSimulationTargetDate(e.target.value)}
+                            className="rounded border border-blue-300 bg-white px-2 py-0.5 font-mono text-xs font-semibold text-slate-900 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setSimulationTargetDate(businessDate)}
+                            className="text-[11px] text-blue-700 underline hover:text-blue-900"
+                          >
+                            현재 영업일자로 맞춤
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 시나리오 3: 예약 원장만 초기화 */}
+                      <div className="flex items-center justify-between rounded border border-slate-200 bg-slate-50/70 p-3 mt-1">
                         <div>
-                          <h4 className="text-xs font-bold text-blue-900">2. 50인 고유 실명 & OTA 대량 인입 (신규 50건 + 재실 30건)</h4>
-                          <p className="text-[11px] text-blue-700">
-                            현재 영업일자({businessDate}) 기준 실명 50건, 6대 OTA 채널 매핑 (미배정 유지)
+                          <h4 className="text-xs font-bold text-slate-800">3. 예약 원장 초기화</h4>
+                          <p className="text-[11px] text-slate-500">모든 예약을 삭제하고 191실을 공실(VACANT)로 리셋합니다.</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (!confirm('정말 모든 예약 내역을 초기화하시겠습니까?')) return;
+                            await pmsService.clearReservations();
+                            void fetchIndicator();
+                            alert('모든 예약 데이터가 초기화되었습니다.');
+                          }}
+                          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-100"
+                        >
+                          예약만 초기화
+                        </button>
+                      </div>
+
+                      {/* 시나리오 4: 모든 설정 완벽 초기화 */}
+                      <div className="flex items-center justify-between rounded border border-rose-300 bg-rose-50/70 p-3 mt-1">
+                        <div>
+                          <h4 className="text-xs font-bold text-rose-800">4. 모든 설정 및 데이터 완벽 초기화 (Full Reset)</h4>
+                          <p className="text-[11px] text-rose-600">
+                            예약 전량 삭제 + 커스텀 태그 삭제 + 191실 공실화 + 영업일자(2026-09-20) 롤백
                           </p>
                         </div>
                         <button
                           onClick={async () => {
-                            const res: any = await pmsService.bulkSimulate50And30(customRequirements, businessDate);
-                            alert(res.message || `${businessDate} 기준 50인 실명 및 OTA 예약 인입 완료`);
+                            if (!confirm('⚠️ 주의: 모든 예약, 커스텀 태그가 영구 삭제되고 시스템 날짜가 2026-09-20으로 복원됩니다. 계속하시겠습니까?')) return;
+                            const res = await pmsService.resetAllSettings();
+                            alert(res.message);
+                            setBusinessDate(res.businessDate);
+                            setSimulationTargetDate(res.businessDate);
                             void fetchIndicator();
                           }}
-                          className="rounded bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700"
+                          className="rounded bg-rose-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-rose-700"
                         >
-                          대량 인입 실행
+                          전체 설정 리셋
                         </button>
                       </div>
 
-                      {/* 시나리오 3 */}
-                      <div className="flex items-center justify-between rounded border border-rose-200 bg-rose-50/60 p-3 mt-auto">
-                        <div>
-                          <h4 className="text-xs font-bold text-rose-800">3. 전체 데이터 초기화</h4>
-                          <p className="text-[11px] text-rose-600">모든 예약 원장 및 191실 객실 상태를 완전한 공실(VACANT)로 리셋[cite: 7]</p>
-                        </div>
-                        <button
-                          onClick={async () => {
-                            if (!confirm('정말 모든 데이터를 초기화하시겠습니까?')) return;
-                            await pmsService.clearReservations();
-                            void fetchIndicator();
-                            alert('모든 데이터가 초기화되었습니다.');
-                          }}
-                          className="rounded border border-rose-300 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 shadow-2xs hover:bg-rose-100"
-                        >
-                          전체 초기화
-                        </button>
-                      </div>
                     </div>
                   </div>
                 </div>

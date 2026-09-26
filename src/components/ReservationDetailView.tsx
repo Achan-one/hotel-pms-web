@@ -4,7 +4,7 @@ import type { ReservationDetailDto } from '../api/pmsService';
 import { pmsService } from '../api/pmsService';
 import apiClient from '../api/client';
 import {
-  ArrowLeft, CheckCircle2, ArrowRightLeft, FileCode, User, KeyRound, UserX, Tag, Plus, Minus, CreditCard, Utensils, Clock, ShieldCheck
+  ArrowLeft, CheckCircle2, ArrowRightLeft, FileCode, User, KeyRound, UserX, Tag, Plus, Minus, CreditCard, Utensils, Clock, ShieldCheck, Lock, Eye
 } from 'lucide-react';
 
 interface Props {
@@ -26,6 +26,10 @@ export default function ReservationDetailView({ reservation: initialReservation,
   const [activeTab, setActiveTab] = useState<'OPERATIONAL' | 'CONTRACT_AUDIT'>('OPERATIONAL');
   const [reservation, setReservation] = useState<ReservationDetailDto>(initialReservation);
 
+  // 🔒 동시 편집 방지 락 상태
+  const [isLockedByOther, setIsLockedByOther] = useState(false);
+  const [lockHolderName, setLockHolderName] = useState('');
+
   const [opGuestName, setOpGuestName] = useState('');
   const [opCheckIn, setOpCheckIn] = useState('');
   const [opNights, setOpNights] = useState(1);
@@ -41,6 +45,31 @@ export default function ReservationDetailView({ reservation: initialReservation,
   const [moveReason, setMoveReason] = useState('고객 시설 보상 업그레이드');
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
+
+  // 1. 화면 진입 시 sessionStorage 기반으로 락 획득 시도 및 종료 시 락 해제
+  useEffect(() => {
+    const savedUser = sessionStorage.getItem('hotel_pms_user');
+    const userObj = savedUser ? JSON.parse(savedUser) : null;
+    const currentStaffId = userObj?.staffId || 'anonymous';
+    const currentStaffName = userObj?.staffName || currentStaffId;
+
+    pmsService.acquireLock(initialReservation.reservationId, currentStaffId, currentStaffName)
+      .then((res) => {
+        if (res.isLockedByOther) {
+          setIsLockedByOther(true);
+          setLockHolderName(res.lockedByStaffName);
+        } else {
+          setIsLockedByOther(false);
+        }
+      })
+      .catch((e) => {
+        console.error('락 획득 실패 (네트워크/인가 오류):', e);
+      });
+
+    return () => {
+      void pmsService.releaseLock(initialReservation.reservationId, currentStaffId);
+    };
+  }, [initialReservation.reservationId]);
 
   useEffect(() => {
     apiClient.get('/api/admin/tags')
@@ -79,6 +108,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
   };
 
   const cycleTagState = (tagCode: string) => {
+    if (isLockedByOther) return;
     if (editPreferredTags.has(tagCode)) {
       setEditPreferredTags((prev) => {
         const next = new Set(prev);
@@ -98,6 +128,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
   };
 
   const handleSaveOperationalTags = async () => {
+    if (isLockedByOther) return;
     setTagSaving(true);
     setMsg('');
     try {
@@ -119,6 +150,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
 
   const handleSaveOperational = async (e: SubmitEvent) => {
     e.preventDefault();
+    if (isLockedByOther) return;
     setLoading(true);
     setMsg('');
     try {
@@ -142,6 +174,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
 
   const handleManualAssign = async (e: SubmitEvent) => {
     e.preventDefault();
+    if (isLockedByOther) return;
     const formatted = formatRoomNumber(assignRoom);
     if (!formatted) return;
     setLoading(true);
@@ -161,6 +194,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
   };
 
   const handleUnassign = async () => {
+    if (isLockedByOther) return;
     if (!confirm(`[${reservation.assignedRoomNumber}호] 배정을 취소하시겠습니까?`)) return;
     setLoading(true);
     setMsg('');
@@ -180,6 +214,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
 
   const handleRoomMove = async (e: SubmitEvent) => {
     e.preventDefault();
+    if (isLockedByOther) return;
     const formatted = formatRoomNumber(moveRoom);
     if (!formatted) return;
     setLoading(true);
@@ -199,6 +234,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
   };
 
   const handleCheckIn = async () => {
+    if (isLockedByOther) return;
     if (!confirm(`[${reservation.assignedRoomNumber}호] 체크인 처리하시겠습니까?`)) return;
     setLoading(true);
     setMsg('');
@@ -218,6 +254,22 @@ export default function ReservationDetailView({ reservation: initialReservation,
 
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-3 font-sans text-slate-800">
+      
+      {/* 🔒 다른 직원이 편집 중일 때 상단 잠금 경고 배너 */}
+      {isLockedByOther && (
+        <div className="flex items-center justify-between rounded border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <Lock size={16} className="text-amber-700" />
+            <span>
+              현재 <b>[{lockHolderName}]</b> 스탭이 이 예약을 편집하고 있습니다. 동시 변경 충돌을 방지하기 위해 <b>읽기 전용 (미리보기 모드)</b>으로 열렸습니다.
+            </span>
+          </div>
+          <span className="flex items-center gap-1 rounded bg-white/80 border border-amber-300 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+            <Eye size={12} /> 미리보기 전용
+          </span>
+        </div>
+      )}
+
       {/* 상단 헤더 바 */}
       <div className="flex items-center justify-between border-b border-slate-300 pb-2.5">
         <div className="flex items-center gap-3">
@@ -249,7 +301,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
                 : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
-            현장 운영 & 객실 제어
+            {isLockedByOther ? '현장 운영 미리보기' : '현장 운영 & 객실 제어'}
           </button>
           <button
             onClick={() => setActiveTab('CONTRACT_AUDIT')}
@@ -274,6 +326,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
       {activeTab === 'OPERATIONAL' && (
         <div className="grid grid-cols-[1.2fr_0.8fr] gap-3">
           <div className="flex flex-col gap-3">
+            
             {/* 운영 태그 오버라이드 */}
             <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
               <div className="mb-1 flex items-center justify-between">
@@ -281,7 +334,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
                   <Tag size={14} className="text-blue-700" />
                   <span>배정 태그 오버라이드</span>
                 </div>
-                <span className="text-[10px] text-slate-400">클릭: 선호(+) / 기피(-) / 해제</span>
+                {!isLockedByOther && <span className="text-[10px] text-slate-400">클릭: 선호(+) / 기피(-) / 해제</span>}
               </div>
 
               <p className="mb-2.5 text-[11px] text-slate-500">
@@ -297,6 +350,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
                     <button
                       key={t.code}
                       type="button"
+                      disabled={isLockedByOther}
                       onClick={() => cycleTagState(t.code)}
                       className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium transition ${
                         isPref
@@ -304,7 +358,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
                           : isAvoid
                           ? 'border-rose-500 bg-rose-50 text-rose-800 font-bold'
                           : 'border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100'
-                      }`}
+                      } ${isLockedByOther ? 'cursor-not-allowed opacity-80' : ''}`}
                     >
                       {isPref && <Plus size={10} strokeWidth={3} />}
                       {isAvoid && <Minus size={10} strokeWidth={3} />}
@@ -318,14 +372,16 @@ export default function ReservationDetailView({ reservation: initialReservation,
                 <span className="text-[11px] text-slate-500">
                   선호 <b className="text-emerald-700">{editPreferredTags.size}</b> / 기피 <b className="text-rose-700">{editAvoidTags.size}</b>
                 </span>
-                <button
-                  type="button"
-                  onClick={handleSaveOperationalTags}
-                  disabled={tagSaving}
-                  className="rounded border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
-                >
-                  {tagSaving ? '저장 중...' : '태그 저장'}
-                </button>
+                {!isLockedByOther && (
+                  <button
+                    type="button"
+                    onClick={handleSaveOperationalTags}
+                    disabled={tagSaving}
+                    className="rounded border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
+                  >
+                    {tagSaving ? '저장 중...' : '태그 저장'}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -341,16 +397,17 @@ export default function ReservationDetailView({ reservation: initialReservation,
             <form onSubmit={handleSaveOperational} className="flex flex-col gap-2.5 rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
               <div className="flex items-center gap-1.5 text-slate-800 font-bold text-xs">
                 <User size={14} className="text-blue-700" />
-                <span>현장 투숙 정보 수정</span>
+                <span>현장 투숙 정보 수정 {isLockedByOther && '(읽기 전용)'}</span>
               </div>
 
               <div>
                 <label className="mb-1 block text-[11px] font-semibold text-slate-600">실투숙자 성명</label>
                 <input
                   type="text"
+                  disabled={isLockedByOther}
                   value={opGuestName}
                   onChange={(e) => setOpGuestName(e.target.value)}
-                  className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                  className={`w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none ${isLockedByOther ? 'bg-slate-100 cursor-not-allowed text-slate-500' : ''}`}
                   required
                 />
               </div>
@@ -360,9 +417,10 @@ export default function ReservationDetailView({ reservation: initialReservation,
                   <label className="mb-1 block text-[11px] font-semibold text-slate-600">체크인 일자</label>
                   <input
                     type="date"
+                    disabled={isLockedByOther}
                     value={opCheckIn}
                     onChange={(e) => setOpCheckIn(e.target.value)}
-                    className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                    className={`w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none ${isLockedByOther ? 'bg-slate-100 cursor-not-allowed text-slate-500' : ''}`}
                     required
                   />
                 </div>
@@ -371,9 +429,10 @@ export default function ReservationDetailView({ reservation: initialReservation,
                   <input
                     type="number"
                     min="1"
+                    disabled={isLockedByOther}
                     value={opNights}
                     onChange={(e) => setOpNights(Number(e.target.value))}
-                    className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                    className={`w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none ${isLockedByOther ? 'bg-slate-100 cursor-not-allowed text-slate-500' : ''}`}
                     required
                   />
                 </div>
@@ -382,20 +441,23 @@ export default function ReservationDetailView({ reservation: initialReservation,
               <div>
                 <label className="mb-1 block text-[11px] font-semibold text-slate-600">프론트 직원 인계 메모</label>
                 <textarea
+                  disabled={isLockedByOther}
                   value={staffMemo}
                   onChange={(e) => setStaffMemo(e.target.value)}
                   rows={2}
-                  className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                  className={`w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none ${isLockedByOther ? 'bg-slate-100 cursor-not-allowed text-slate-500' : ''}`}
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="mt-1 rounded bg-slate-800 p-2 text-xs font-semibold text-white transition hover:bg-slate-700"
-              >
-                정보 수정 저장
-              </button>
+              {!isLockedByOther && (
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="mt-1 rounded bg-slate-800 p-2 text-xs font-semibold text-white transition hover:bg-slate-700"
+                >
+                  정보 수정 저장
+                </button>
+              )}
             </form>
           </div>
 
@@ -413,7 +475,15 @@ export default function ReservationDetailView({ reservation: initialReservation,
               </div>
             </div>
 
-            {reservation.status !== 'CHECKED_IN' && reservation.status !== 'CHECKED_OUT' && reservation.status !== 'CANCELLED' && (
+            {isLockedByOther && (
+              <div className="rounded border border-slate-300 bg-slate-100 p-4 text-center text-xs text-slate-500">
+                <Lock size={20} className="mx-auto mb-1 text-slate-400" />
+                <p className="font-semibold text-slate-700">객실 배정 및 제어 잠김</p>
+                <p className="text-[11px] mt-1">다른 스탭이 편집 작업을 마칠 때까지 배정 및 체크인이 제한됩니다.</p>
+              </div>
+            )}
+
+            {!isLockedByOther && reservation.status !== 'CHECKED_IN' && reservation.status !== 'CHECKED_OUT' && reservation.status !== 'CANCELLED' && (
               <div className="flex flex-col gap-2.5 rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
                 <form onSubmit={handleManualAssign} className="flex flex-col gap-2">
                   <div className="flex items-center gap-1.5 text-slate-800 font-bold text-xs">
@@ -461,7 +531,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
               </div>
             )}
 
-            {reservation.status === 'CHECKED_IN' && (
+            {!isLockedByOther && reservation.status === 'CHECKED_IN' && (
               <form onSubmit={handleRoomMove} className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3.5 shadow-2xs">
                 <div className="flex items-center gap-1.5 text-amber-800 font-bold text-xs">
                   <ArrowRightLeft size={14} />
@@ -495,10 +565,9 @@ export default function ReservationDetailView({ reservation: initialReservation,
         </div>
       )}
 
-      {/* 탭 2: 계약 원장 및 감사 스냅샷 (전문 B2B 원장 규격 전면 개편) */}
+      {/* 탭 2: 원천 계약 감사 탭 */}
       {activeTab === 'CONTRACT_AUDIT' && (
         <div className="flex w-full flex-col gap-3 font-sans text-slate-800">
-          {/* 상단 감사 안내 배너 */}
           <div className="flex items-center justify-between rounded border border-slate-300 bg-white p-4 shadow-2xs">
             <div>
               <div className="flex items-center gap-2">
@@ -509,7 +578,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                채널 매니저(CMS) 최초 인입 원본 계약 데이터와 프론트 현장 수정 내역을 1:1로 대조합니다. 원천 계약은 영구 보존됩니다[cite: 1].
+                채널 매니저(CMS) 최초 인입 원본 계약 데이터와 프론트 현장 수정 내역을 1:1로 대조합니다[cite: 1].
               </p>
             </div>
             <div className="text-right font-mono text-xs">
@@ -517,7 +586,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
             </div>
           </div>
 
-          {/* 1. 계약 원본 vs 현장 운영 상태 1:1 대조 테이블 */}
           <div className="overflow-hidden rounded border border-slate-300 bg-white shadow-2xs">
             <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-800 flex items-center gap-1.5">
               <ShieldCheck size={14} className="text-emerald-600" />
@@ -533,7 +601,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {/* 고객 성명 */}
                 <tr className="hover:bg-slate-50">
                   <td className="px-4 py-2.5 font-semibold text-slate-700">고객 성명</td>
                   <td className="px-4 py-2.5 font-bold text-slate-900 font-mono">
@@ -550,7 +617,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
                     )}
                   </td>
                 </tr>
-                {/* 계약 룸타입 */}
                 <tr className="hover:bg-slate-50">
                   <td className="px-4 py-2.5 font-semibold text-slate-700">계약 룸타입</td>
                   <td className="px-4 py-2.5 font-medium text-slate-900">
@@ -566,7 +632,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
                     <span className="rounded bg-emerald-50 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">기준 일치</span>
                   </td>
                 </tr>
-                {/* 체크인 일자 */}
                 <tr className="hover:bg-slate-50">
                   <td className="px-4 py-2.5 font-semibold text-slate-700">체크인 일자</td>
                   <td className="px-4 py-2.5 font-mono text-slate-800">
@@ -583,7 +648,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
                     )}
                   </td>
                 </tr>
-                {/* 숙박 박수 */}
                 <tr className="hover:bg-slate-50">
                   <td className="px-4 py-2.5 font-semibold text-slate-700">숙박 박수</td>
                   <td className="px-4 py-2.5 font-mono text-slate-800">
@@ -604,9 +668,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
             </table>
           </div>
 
-          {/* 2. 결제 원장, 조식 식권, 채널 플랜 상세 3열 카드 */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            {/* 결제 원장 (PaymentLedger) */}
             <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 border-b border-slate-200 pb-2 mb-2">
@@ -638,7 +700,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
               </div>
             </div>
 
-            {/* 식권 및 부대옵션 (BreakfastOption) */}
             <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 border-b border-slate-200 pb-2 mb-2">
@@ -668,7 +729,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
               </div>
             </div>
 
-            {/* 도착 예정 시간 및 운영 세부 */}
             <div className="rounded border border-slate-300 bg-white p-3.5 shadow-2xs flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 border-b border-slate-200 pb-2 mb-2">
@@ -694,32 +754,6 @@ export default function ReservationDetailView({ reservation: initialReservation,
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* 3. 채널 매니저 계약 플랜 및 인입 전문 뷰어 */}
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <div className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-4 shadow-2xs">
-              <h4 className="text-xs font-bold text-slate-900 border-b border-slate-200 pb-2">
-                OTA 채널 계약 플랜 상세
-              </h4>
-              <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800">
-                <span className="text-slate-500 block text-[11px] mb-1">인입 플랜 정식 명칭</span>
-                <b className="text-slate-900 text-sm">{reservation.channelInfo?.planName || '【공식 웹】 스탠다드 룸 플랜 (조식 포함/부대시설 이용 규격)'}</b>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-4 shadow-2xs">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <h4 className="text-xs font-bold text-slate-900">OTA 고객 원문 요청사항 (Raw Payload Memo)</h4>
-                <span className="text-[10px] text-slate-400 font-mono">AUDIT TRAIL</span>
-              </div>
-              <div className="rounded border border-slate-200 bg-slate-50 p-3 font-mono text-xs text-slate-800 leading-relaxed min-h-[90px] whitespace-pre-wrap">
-                {reservation.rawRequestText ? reservation.rawRequestText : '// 고객 인입 요청사항 없음 (Standard Room Booking)'}
-              </div>
-              <span className="text-[10px] text-slate-400">
-                * 이 메모는 분쟁 방지를 위해 시스템에 불변(Read-Only) 원본으로 보존됩니다[cite: 1].
-              </span>
             </div>
           </div>
         </div>
