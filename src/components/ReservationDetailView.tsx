@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { SubmitEvent } from 'react';
 import type { ReservationDetailDto, FolioChargeCodeDto } from '../api/pmsService';
 import { pmsService } from '../api/pmsService';
@@ -50,7 +50,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
 
   const [chargeCodes, setChargeCodes] = useState<FolioChargeCodeDto[]>([]);
 
-  // 모달 제어
+  // 🚀 모달 제어 상태 (이용 명세 등록 vs 수납 등록)
   const [folioModalMode, setFolioModalMode] = useState<'NONE' | 'CHARGE' | 'PAYMENT'>('NONE');
   const [folioAmount, setFolioAmount] = useState<number>(0);
   const [folioMemo, setFolioMemo] = useState('');
@@ -412,21 +412,37 @@ export default function ReservationDetailView({ reservation: initialReservation,
     }
   };
 
-  // 🚀 원장 계산: transactions 배열을 기준으로 투명하고 정확하게 실시간 산출
-  const transactions = (reservation.transactions && reservation.transactions.length > 0)
-    ? reservation.transactions
-    : ((reservation as any).paymentLedger?.transactions || []);
+  // 🚀 [해결 방법 2] checkOutDate 타입 에러 안전 도출 연산
+  const derivedCheckOutDate = useMemo(() => {
+    if ((reservation as any).checkOutDate) return String((reservation as any).checkOutDate);
+    const ci = reservation.operationalCheckInDate || reservation.checkInDate;
+    const nights = reservation.operationalStayNights ?? reservation.stayNights ?? 1;
+    if (!ci) return '';
+    const d = new Date(ci);
+    d.setDate(d.getDate() + nights);
+    return d.toISOString().split('T')[0];
+  }, [reservation]);
 
-  const totalCharges = transactions
-    .filter((t: any) => t.type === 'CHARGE')
-    .reduce((acc: number, t: any) => acc + t.amount, 0);
+  // 🚀 [원장 계산식]: 체크인 전/오딧 전에는 청구 0원. 오직 등록된 거래(Folio Transactions)만 정직하게 합산
+  const transactions = useMemo(() => {
+    const list = reservation.transactions || (reservation as any).paymentLedger?.transactions;
+    return Array.isArray(list) ? list : [];
+  }, [reservation]);
 
-  const totalPayments = transactions
-    .filter((t: any) => t.type === 'PAYMENT')
-    .reduce((acc: number, t: any) => acc + t.amount, 0);
+  const totalCharges = useMemo(() => {
+    return transactions
+      .filter((t: any) => t.type === 'CHARGE')
+      .reduce((acc: number, t: any) => acc + t.amount, 0);
+  }, [transactions]);
+
+  const totalPayments = useMemo(() => {
+    return transactions
+      .filter((t: any) => t.type === 'PAYMENT')
+      .reduce((acc: number, t: any) => acc + t.amount, 0);
+  }, [transactions]);
 
   const balanceDue = totalCharges - totalPayments;
-  const isCheckoutDue = reservation.status === 'CHECKED_IN' && reservation.checkOutDate <= businessDate;
+  const isCheckoutDue = reservation.status === 'CHECKED_IN' && derivedCheckOutDate <= businessDate;
 
   return (
     <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-3 font-sans text-slate-800">
@@ -743,7 +759,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
                       {isCheckoutDue ? '오늘 퇴실 예정 고객 (Due Out)' : '투숙 체류 중 (In-House)'}
                     </span>
                     <span className="font-mono text-[11px] text-slate-500">
-                      예정 퇴실일: {reservation.checkOutDate}
+                      예정 퇴실일: {derivedCheckOutDate}
                     </span>
                   </div>
 
