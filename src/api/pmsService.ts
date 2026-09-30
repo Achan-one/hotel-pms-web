@@ -84,6 +84,18 @@ export interface ReservationDetailDto {
 
 export type ReservationDto = ReservationDetailDto;
 
+// 서버 목록 응답의 한 페이지. page는 0부터 시작한다.
+export interface PageDto<T> {
+  items: T[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+// 서버가 허용하는 최대 size(500)와 같게 맞춘다. 페이지 수 상한은 응답이 깨졌을 때 무한 반복을 막는 안전장치다.
+const RESERVATION_PAGE_SIZE = 500;
+const MAX_RESERVATION_PAGES = 200;
+
 export interface ReservationSearchParams {
   guestName?: string;
   reservationId?: string;
@@ -124,6 +136,10 @@ function triggerFileDownload(blobData: BlobPart, fileName: string) {
   window.URL.revokeObjectURL(url);
 }
 
+function periodLabel(startDate: string, endDate: string): string {
+  return startDate === endDate ? startDate : `${startDate}_${endDate}`;
+}
+
 export const pmsService = {
   // 인증
   login: async (staffId: string, password: string): Promise<LoginResponse> => {
@@ -149,10 +165,18 @@ export const pmsService = {
     return pmsService.getRoomIndicator(targetDate);
   },
 
-  // 예약 조회
+  // 예약 조회. 서버는 페이지 단위로 응답하므로 마지막 페이지까지 이어 받아 전체 목록으로 돌려준다.
   getReservations: async (params?: ReservationSearchParams): Promise<ReservationDetailDto[]> => {
-    const res = await apiClient.get<ApiResponse<ReservationDetailDto[]>>('/api/reservations', { params });
-    return res.data.data;
+    const all: ReservationDetailDto[] = [];
+    for (let page = 0; page < MAX_RESERVATION_PAGES; page += 1) {
+      const res = await apiClient.get<ApiResponse<PageDto<ReservationDetailDto>>>('/api/reservations', {
+        params: { ...params, page, size: RESERVATION_PAGE_SIZE },
+      });
+      const { items, total } = res.data.data;
+      all.push(...items);
+      if (items.length === 0 || all.length >= total) break;
+    }
+    return all;
   },
   searchReservations: async (condition?: Record<string, any>): Promise<ReservationDetailDto[]> => {
     return pmsService.getReservations(condition);
@@ -415,20 +439,22 @@ export const pmsService = {
     return res.data;
   },
 
-  downloadInHouseCsv: async (targetDate: string) => {
+  // 조회 기간 [startDate, endDate] 중 하룻밤이라도 묵는 사람. 같은 날짜를 넣으면 그날 하루만 조회한다.
+  downloadInHouseCsv: async (startDate: string, endDate: string) => {
     const res = await apiClient.get('/api/reports/in-house/csv', {
-      params: { targetDate },
+      params: { startDate, endDate },
       responseType: 'blob',
     });
-    triggerFileDownload(res.data, `숙박자리스트_${targetDate}.csv`);
+    triggerFileDownload(res.data, `숙박자리스트_${periodLabel(startDate, endDate)}.csv`);
   },
 
-  downloadReservationsCsv: async (startDate: string, status?: string) => {
+  // 체크인 일자가 [startDate, endDate]에 드는 예약의 전체 정보. 같은 날짜를 넣으면 그날 체크인만 조회한다.
+  downloadReservationsCsv: async (startDate: string, endDate: string, status?: string) => {
     const res = await apiClient.get('/api/reports/reservations/csv', {
-      params: { startDate, status: status || undefined },
+      params: { startDate, endDate, status: status || undefined },
       responseType: 'blob',
     });
-    triggerFileDownload(res.data, `예약자리스트_${startDate}.csv`);
+    triggerFileDownload(res.data, `예약자리스트_${periodLabel(startDate, endDate)}.csv`);
   },
 
   downloadSpecialRequestsCsv: async (targetDate: string) => {

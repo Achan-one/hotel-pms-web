@@ -540,7 +540,7 @@ export default function App() {
               )}
 
               {/* 4. 태그 사전 관리 탭 */}
-              {activeTab === 'TAGS' && <TagManagementView />}
+              {activeTab === 'TAGS' && <TagManagementView canRegister={currentUser?.role === 'ROLE_ADMIN'} />}
 
               {/* 5. 직원 계정 발급 탭 */}
               {activeTab === 'STAFF_MGMT' && <StaffManagementView />}

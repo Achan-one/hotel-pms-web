@@ -24,7 +24,12 @@ const SYSTEM_DEFAULT_CODES = new Set([
   'ACCESSIBLE',
 ]);
 
-export default function TagManagementView() {
+interface TagManagementViewProps {
+  // 새 태그 정의 등록은 관리자만 할 수 있다. 정직원은 기존 태그 수정, 삭제, 객실 배치만 가능하다.
+  canRegister: boolean;
+}
+
+export default function TagManagementView({ canRegister }: TagManagementViewProps) {
   const [tagList, setTagList] = useState<RoomTagItem[]>([]);
   const [listLoading, setListLoading] = useState(false);
 
@@ -239,12 +244,14 @@ export default function TagManagementView() {
           >
             <RefreshCw size={13} className={listLoading ? 'animate-spin' : ''} /> 새로고침
           </button>
-          <button
-            onClick={() => setIsRegisterModalOpen(true)}
-            className="flex items-center gap-1.5 rounded bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700"
-          >
-            <PlusCircle size={14} /> 새 태그 정의 등록
-          </button>
+          {canRegister && (
+            <button
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="flex items-center gap-1.5 rounded bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700"
+            >
+              <PlusCircle size={14} /> 새 태그 정의 등록
+            </button>
+          )}
         </div>
       </div>
 

@@ -6,11 +6,15 @@ interface Props {
   businessDate: string;
 }
 
+const MAX_REPORT_DAYS = 31;
+
 export default function ExportReportView({ businessDate }: Props) {
-  const [stayTargetDate, setStayTargetDate] = useState(businessDate);
+  const [stayStartDate, setStayStartDate] = useState(businessDate);
+  const [stayEndDate, setStayEndDate] = useState(businessDate);
   const [isStayingDownloading, setIsStayingDownloading] = useState(false);
 
   const [reserveStartDate, setReserveStartDate] = useState(businessDate);
+  const [reserveEndDate, setReserveEndDate] = useState(businessDate);
   const [reserveStatus, setReserveStatus] = useState<string>('');
   const [isReserveDownloading, setIsReserveDownloading] = useState(false);
 
@@ -20,14 +24,24 @@ export default function ExportReportView({ businessDate }: Props) {
   const [isRoomTagsDownloading, setIsRoomTagsDownloading] = useState(false);
   const [isTagMatrixDownloading, setIsTagMatrixDownloading] = useState(false);
 
+  // 종료일이 시작일보다 앞서면 서버가 거부하므로 미리 안내한다. 최대 조회 기간도 서버 정책(31일)과 같다.
+  const validatePeriod = (start: string, end: string): string | null => {
+    if (!start || !end) return '시작일과 종료일을 모두 선택해 주세요.';
+    if (start > end) return '시작일이 종료일보다 늦을 수 없습니다.';
+    const days = (Date.parse(end) - Date.parse(start)) / 86_400_000 + 1;
+    if (days > MAX_REPORT_DAYS) return `조회 기간은 최대 ${MAX_REPORT_DAYS}일까지 가능합니다. (선택: ${days}일)`;
+    return null;
+  };
+
   const handleDownloadInHouse = async () => {
-    if (stayTargetDate > businessDate) {
-      alert(`숙박자 리스트는 현재 영업일자(${businessDate}) 이후의 미래 일자로 조회할 수 없습니다.`);
+    const problem = validatePeriod(stayStartDate, stayEndDate);
+    if (problem) {
+      alert(problem);
       return;
     }
     setIsStayingDownloading(true);
     try {
-      await pmsService.downloadInHouseCsv(stayTargetDate);
+      await pmsService.downloadInHouseCsv(stayStartDate, stayEndDate);
     } catch (err) {
       console.error(err);
       alert('숙박자 리스트 다운로드 중 오류가 발생했습니다.');
@@ -37,9 +51,14 @@ export default function ExportReportView({ businessDate }: Props) {
   };
 
   const handleDownloadReservations = async () => {
+    const problem = validatePeriod(reserveStartDate, reserveEndDate);
+    if (problem) {
+      alert(problem);
+      return;
+    }
     setIsReserveDownloading(true);
     try {
-      await pmsService.downloadReservationsCsv(reserveStartDate, reserveStatus || undefined);
+      await pmsService.downloadReservationsCsv(reserveStartDate, reserveEndDate, reserveStatus || undefined);
     } catch (err) {
       console.error(err);
       alert('예약자 리스트 다운로드 중 오류가 발생했습니다.');
@@ -105,17 +124,31 @@ export default function ExportReportView({ businessDate }: Props) {
               <span>1. 숙박자 리스트 (In-House)</span>
             </div>
             <p className="mb-3 text-[11px] text-slate-500">
-              체류일자 기준 실제 투숙(재실) 중인 인원 목록입니다. (기준 영업일자: {businessDate} 초과 불가)
+              선택한 기간 중 하룻밤이라도 묵는 인원 목록입니다. 시작일과 종료일이 같으면 그날 밤 묵는 사람만 나옵니다.
+              (취소 제외, 미배정은 호실이 "미배정"으로 표시, 최대 {MAX_REPORT_DAYS}일)
             </p>
 
-            <label className="mb-1 block text-[11px] font-semibold text-slate-600">체류 기준 일자</label>
-            <input
-              type="date"
-              max={businessDate}
-              value={stayTargetDate}
-              onChange={(e) => setStayTargetDate(e.target.value)}
-              className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
-            />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="mb-1 block text-[11px] font-semibold text-slate-600">시작일</label>
+                <input
+                  type="date"
+                  value={stayStartDate}
+                  onChange={(e) => setStayStartDate(e.target.value)}
+                  className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="mb-1 block text-[11px] font-semibold text-slate-600">종료일</label>
+                <input
+                  type="date"
+                  value={stayEndDate}
+                  min={stayStartDate}
+                  onChange={(e) => setStayEndDate(e.target.value)}
+                  className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                />
+              </div>
+            </div>
           </div>
 
           <button
@@ -137,12 +170,13 @@ export default function ExportReportView({ businessDate }: Props) {
               <span>2. 예약자 리스트</span>
             </div>
             <p className="mb-3 text-[11px] text-slate-500">
-              선택한 체크인 일자의 전체 예약 원장과 배정 상태를 출력합니다.
+              선택한 기간에 체크인하는 예약의 전체 정보를 출력합니다. 시작일과 종료일이 같으면 그날 체크인만 나옵니다.
+              (최대 {MAX_REPORT_DAYS}일)
             </p>
 
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="mb-1 block text-[11px] font-semibold text-slate-600">체크인 일자</label>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-600">체크인 시작일</label>
                 <input
                   type="date"
                   value={reserveStartDate}
@@ -150,6 +184,19 @@ export default function ExportReportView({ businessDate }: Props) {
                   className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
                 />
               </div>
+              <div className="flex-1">
+                <label className="mb-1 block text-[11px] font-semibold text-slate-600">체크인 종료일</label>
+                <input
+                  type="date"
+                  value={reserveEndDate}
+                  min={reserveStartDate}
+                  onChange={(e) => setReserveEndDate(e.target.value)}
+                  className="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="mt-2 flex gap-2">
               <div className="flex-1">
                 <label className="mb-1 block text-[11px] font-semibold text-slate-600">상태 필터</label>
                 <select
