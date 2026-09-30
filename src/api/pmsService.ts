@@ -163,6 +163,35 @@ export const pmsService = {
     return res.data.data;
   },
 
+  // 특정 태그가 부여된 방 목록 조회
+  getRoomsByTag: async (tagCode: string): Promise<string[]> => {
+    const encoded = encodeURIComponent(tagCode);
+    const res = await apiClient.get<ApiResponse<string[]>>(`/api/admin/tags/${encoded}/rooms`);
+    return res.data.data;
+  },
+
+  // 특정 태그의 방 배치 전체 갱신 (기본/커스텀 태그 공통)
+  updateRoomsForTag: async (tagCode: string, targetRoomNumbers: string[]) => {
+    const encoded = encodeURIComponent(tagCode);
+    const res = await apiClient.put<ApiResponse<void>>(`/api/admin/tags/${encoded}/rooms`, {
+      targetRoomNumbers,
+    });
+    return res.data;
+  },
+  // 태그 속성 및 방 배치 통합 수정
+  updateTagFull: async (tagCode: string, data: {
+    name?: string;
+    description?: string;
+    category?: string;
+    strictness?: string;
+    defaultWeight?: number;
+    targetRoomNumbers: string[];
+  }) => {
+    const encoded = encodeURIComponent(tagCode);
+    const res = await apiClient.put<ApiResponse<void>>(`/api/admin/tags/${encoded}`, data);
+    return res.data;
+  },
+
   // 일자별 요금 스케줄 갱신
   updateDailyRates: async (reservationId: string, dailyRates: Record<string, number>) => {
     const res = await apiClient.put<ApiResponse<void>>(

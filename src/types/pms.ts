@@ -50,6 +50,7 @@ export interface RoomMatrixItemDto {
     reservationId: string | null;
     guestName: string | null;
     stayPeriodStr: string | null;
+    tags?: string[];
 }
 
 export interface FloorMapResponseDto {
