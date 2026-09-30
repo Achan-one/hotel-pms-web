@@ -61,3 +61,28 @@ export interface FloorMapResponseDto {
     occupancyRatePercent: number;
     floorRooms: Record<string, RoomMatrixItemDto[]>;
 }
+
+// 룸 매트릭스에 나오는 태그 코드를 사람이 읽는 이름으로 바꾸기 위한 목록. 모든 직원이 볼 수 있다.
+export interface TagCatalogItem {
+    code: string;
+    name: string;
+    description: string;
+    category: string;
+    strictness: string;
+}
+
+// 일괄 배정, 해제가 서버에서 진행 중인지. 진행 중이면 예약은 조회만 할 수 있다.
+export interface BatchStatus {
+    active: boolean;
+    operation?: 'BATCH_ASSIGN' | 'BATCH_UNASSIGN';
+    label?: string;
+    staffId?: string;
+    targetDate?: string;
+    startedAt?: string;
+}
+
+export interface BatchUnassignResult {
+    checkInDate: string;
+    releasedReservationIds: string[];
+    keptInHouseCount: number;
+}

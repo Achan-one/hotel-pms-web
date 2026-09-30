@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { SubmitEvent } from 'react';
 import { pmsService } from './api/pmsService';
 import type { ReservationDetailDto } from './api/pmsService';
-import type { FloorMapResponseDto, LoginResponse, RoomMatrixItemDto } from './types/pms';
+import type { FloorMapResponseDto, LoginResponse, RoomMatrixItemDto, TagCatalogItem } from './types/pms';
 import Sidebar, { type TabType } from './components/Sidebar';
 import ReservationDetailView from './components/ReservationDetailView';
 import ReservationGridView from './components/ReservationGridView';
@@ -10,8 +10,11 @@ import TagManagementView from './components/TagManagementView';
 import ExportReportView from './components/ExportReportView';
 import StaffManagementView from './components/StaffManagementView';
 import CityLedgerView from './components/CityLedgerView';
+import RoomMatrixGrid from './components/RoomMatrixGrid';
+import { buildTagNameMap, roomTooltip } from './components/tagDisplay';
+import { useBatchStatus } from './hooks/useBatchStatus';
 import {
-  LogIn, RefreshCw, Hotel, Clock, Plus, Trash2, ListChecks, CheckCircle2, AlertCircle
+  LogIn, RefreshCw, Hotel, Clock, Plus, Trash2, ListChecks, CheckCircle2, AlertCircle, Lock
 } from 'lucide-react';
 
 export default function App() {
@@ -33,6 +36,11 @@ export default function App() {
 
   const [activeDetailReservation, setActiveDetailReservation] = useState<ReservationDetailDto | null>(null);
 
+  const [tagCatalog, setTagCatalog] = useState<TagCatalogItem[]>([]);
+
+  // 일괄 배정, 해제 대상 체크인 일자. 영업일과 다른 날짜도 고를 수 있다.
+  const [batchTargetDate, setBatchTargetDate] = useState('2026-09-20');
+  const [isUnassigning, setIsUnassigning] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isNightAuditing, setIsNightAuditing] = useState(false);
   const [assignToast, setAssignToast] = useState<{ message: string; isError?: boolean } | null>(null);
@@ -119,6 +127,7 @@ export default function App() {
         if (serverDate) {
           setBusinessDate(serverDate);
           setSimulationTargetDate(serverDate);
+          setBatchTargetDate(serverDate);
         }
       })
       .catch((err) => console.error('시스템 영업일자 조회 실패:', err));
@@ -128,8 +137,13 @@ export default function App() {
     if (!currentUser) return;
     setIndicatorLoading(true);
     try {
-      const data = await pmsService.getRoomIndicator(businessDate);
+      // 태그 이름표는 룸 매트릭스 툴팁에만 쓰므로 실패해도 매트릭스는 그대로 보여 준다.
+      const [data, catalog] = await Promise.all([
+        pmsService.getRoomIndicator(businessDate),
+        pmsService.getTagCatalog().catch(() => [] as TagCatalogItem[]),
+      ]);
       setIndicatorData(data);
+      setTagCatalog(catalog);
     } catch (err) {
       console.error('인디케이터 로드 실패:', err);
     } finally {
@@ -143,6 +157,10 @@ export default function App() {
     }
   }, [currentUser, activeTab, fetchIndicator]);
 
+  // 다른 직원이 일괄 배정, 해제를 돌리는 동안 예약은 조회만 가능하다. 끝나면 룸 매트릭스를 다시 읽는다.
+  const batchStatus = useBatchStatus(Boolean(currentUser), () => { void fetchIndicator(); });
+  const tagNames = buildTagNameMap(tagCatalog);
+
   const handleBusinessDateChange = async (newDate: string) => {
     setBusinessDate(newDate);
     setSimulationTargetDate(newDate);
@@ -153,32 +171,67 @@ export default function App() {
     }
   };
 
+  const errorMessageOf = (err: unknown, fallback: string): string => {
+    if (err && typeof err === 'object' && 'response' in err) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      return axiosErr.response?.data?.message || fallback;
+    }
+    return fallback;
+  };
+
+  const showToast = (message: string, isError = false) => {
+    setAssignToast({ message, isError });
+    setTimeout(() => setAssignToast(null), 5000);
+  };
+
   const handleBatchAssign = async () => {
-    if (!confirm(`${businessDate} 일자의 미배정 예약을 규칙 기반으로 일괄 자동 배정하시겠습니까?`)) return;
+    if (!batchTargetDate) {
+      showToast('체크인 일자를 선택해 주세요.', true);
+      return;
+    }
+    if (!confirm(`${batchTargetDate} 체크인 미배정 예약을 규칙 기반으로 일괄 자동 배정하시겠습니까?\n진행하는 동안 모든 직원의 예약 화면은 조회만 가능합니다.`)) return;
 
     setIsAssigning(true);
     setAssignToast(null);
 
     try {
-      const res: any = await pmsService.runBatchAssign(businessDate);
+      const res: any = await pmsService.runBatchAssign(batchTargetDate);
       const successCount = res?.data?.successfulAssignments?.length ?? 0;
       const failCount = res?.data?.failedAssignments?.length ?? 0;
-      const summaryMsg = `일괄 배정 완료: 성공 ${successCount}건 / 실패 ${failCount}건 (${businessDate})`;
-
-      setAssignToast({ message: summaryMsg });
+      showToast(`일괄 배정 완료: 성공 ${successCount}건 / 실패 ${failCount}건 (${batchTargetDate})`);
       void fetchIndicator();
     } catch (err: unknown) {
-      let errMsg = '일괄 배정 실패';
-      if (err && typeof err === 'object' && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        errMsg = axiosErr.response?.data?.message || errMsg;
-      }
-      setAssignToast({ message: errMsg, isError: true });
+      showToast(errorMessageOf(err, '일괄 배정 실패'), true);
     } finally {
       setIsAssigning(false);
-      setTimeout(() => {
-        setAssignToast(null);
-      }, 5000);
+    }
+  };
+
+  const handleBatchUnassign = async () => {
+    if (!batchTargetDate) {
+      showToast('체크인 일자를 선택해 주세요.', true);
+      return;
+    }
+    if (!confirm(
+      `${batchTargetDate} 체크인 예약의 배정을 모두 해제하시겠습니까?\n\n` +
+      `* 배정 완료 상태의 예약만 미배정으로 돌아갑니다.\n` +
+      `* 이미 체크인했거나 퇴실한 예약, 취소된 예약은 그대로 둡니다.\n` +
+      `* 진행하는 동안 모든 직원의 예약 화면은 조회만 가능합니다.`
+    )) return;
+
+    setIsUnassigning(true);
+    setAssignToast(null);
+
+    try {
+      const res = await pmsService.runBatchUnassign(batchTargetDate);
+      const released = res.data.releasedReservationIds.length;
+      const kept = res.data.keptInHouseCount;
+      showToast(`일괄 해제 완료: ${released}건 미배정으로 복귀${kept > 0 ? ` (체크인/퇴실 ${kept}건은 유지)` : ''} (${batchTargetDate})`);
+      void fetchIndicator();
+    } catch (err: unknown) {
+      showToast(errorMessageOf(err, '일괄 해제 실패'), true);
+    } finally {
+      setIsUnassigning(false);
     }
   };
 
@@ -301,15 +354,25 @@ export default function App() {
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-[#f1f5f9] font-sans text-slate-800">
       
+      {/* 일괄 배정, 해제 진행 중에는 예약이 조회만 가능하다는 안내 */}
+      {batchStatus.active && (
+        <div className="pointer-events-none fixed top-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-md">
+          <Lock size={13} className="text-amber-700" />
+          <span>
+            {batchStatus.label} 진행 중 (실행: {batchStatus.staffId}, 대상 {batchStatus.targetDate}) · 끝날 때까지 예약은 조회만 가능합니다
+          </span>
+        </div>
+      )}
+
       {/* 우측 상단 토스트 */}
-      {(isAssigning || assignToast) && (
+      {(isAssigning || isUnassigning || assignToast) && (
         <div className={`pointer-events-none fixed top-3 right-6 z-50 flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold shadow-md ${
-          isAssigning ? 'border-sky-300 bg-white text-sky-800' : assignToast?.isError ? 'border-rose-300 bg-white text-rose-800' : 'border-emerald-300 bg-white text-emerald-800'
+          (isAssigning || isUnassigning) ? 'border-sky-300 bg-white text-sky-800' : assignToast?.isError ? 'border-rose-300 bg-white text-rose-800' : 'border-emerald-300 bg-white text-emerald-800'
         }`}>
-          {isAssigning ? (
+          {(isAssigning || isUnassigning) ? (
             <>
               <RefreshCw size={13} className="animate-spin text-sky-600" />
-              <span>일괄 자동 배정 처리 중...</span>
+              <span>{isUnassigning ? '일괄 배정 해제 처리 중...' : '일괄 자동 배정 처리 중...'}</span>
             </>
           ) : (
             <>
@@ -364,6 +427,7 @@ export default function App() {
             <ReservationDetailView
               reservation={activeDetailReservation}
               businessDate={businessDate}
+              batchLock={batchStatus.active ? { label: batchStatus.label ?? '일괄 작업', staffId: batchStatus.staffId ?? '' } : null}
               onBack={() => { setActiveDetailReservation(null); void fetchIndicator(); }}
               onUpdated={() => { void fetchIndicator(); }}
             />
@@ -405,108 +469,40 @@ export default function App() {
                   {indicatorData && (
                     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-slate-300 bg-slate-200/60 p-1.5 shadow-xs">
                       
-                      {/* 가로 축 호수 헤더 */}
-                      <div className="flex items-center gap-1 pb-1 border-b border-slate-300/80 mb-1">
-                        <div className="w-10 min-w-[40px] text-center text-[10px] font-bold text-slate-500 uppercase">
-                          층 / 호
-                        </div>
-                        <div className="grid flex-1 grid-cols-16 gap-1">
-                          {Array.from({ length: 16 }, (_, i) => i + 1).map((r) => (
+                      <RoomMatrixGrid
+                        floorRooms={indicatorData.floorRooms}
+                        renderRoom={(room) => {
+                          const typeCode =
+                            room.roomType === 'EXECUTIVE_DOUBLE' ? 'EXC' :
+                            room.roomType === 'SUPERIOR_TWIN' ? 'TWN' :
+                            room.roomType === 'RESIDENTIAL_DOUBLE' ? 'RSD' :
+                            room.roomType === 'SUPERIOR_DOUBLE' ? 'SDB' : 'MOD';
+
+                          return (
                             <div
-                              key={r}
-                              className={`text-center font-mono text-[10px] font-bold ${
-                                r === 13 ? 'text-slate-400' : 'text-slate-600'
-                              }`}
+                              title={roomTooltip(room, tagNames)}
+                              className={`flex h-full min-w-0 select-none flex-col justify-between rounded border px-1 py-0.5 shadow-2xs transition hover:brightness-95 ${getStatusClass(room.status)}`}
                             >
-                              {r < 10 ? `0${r}` : `${r}`}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 층별 행 렌더링 */}
-                      <div className="flex min-h-0 flex-1 flex-col justify-between gap-1">
-                        {Object.entries(indicatorData.floorRooms)
-                          .sort(([a], [b]) => Number(b) - Number(a))
-                          .map(([floorStr, rooms]) => {
-                            const floor = Number(floorStr);
-                            const prefix = floor < 10 ? `0${floor}` : `${floor}`;
-                            const roomMap = new Map(rooms.map((r) => [r.roomNumber, r]));
-
-                            return (
-                              <div key={floor} className="flex min-h-0 flex-1 items-stretch gap-1">
-                                <div className="flex w-10 min-w-[40px] select-none items-center justify-center rounded border border-slate-300 bg-slate-100 font-mono text-xs font-extrabold text-slate-700 shadow-2xs">
-                                  {floor}F
-                                </div>
-
-                                <div className="grid flex-1 grid-cols-16 gap-1">
-                                  {Array.from({ length: 16 }, (_, rIdx) => rIdx + 1).map((r) => {
-                                    const padRoom = r < 10 ? `0${r}` : `${r}`;
-                                    const roomNo = `${prefix}${padRoom}`;
-
-                                    if (r === 13) {
-                                      return (
-                                        <div
-                                          key={r}
-                                          title="13호 서양권 금기 결번"
-                                          className="flex h-full select-none items-center justify-center rounded border border-dashed border-slate-300 bg-slate-100/60 font-mono text-[10px] text-slate-400"
-                                        >
-                                          결번
-                                        </div>
-                                      );
-                                    }
-
-                                    if (floor >= 14 && (r === 3 || r === 7)) {
-                                      return (
-                                        <div
-                                          key={r}
-                                          title="공조/설비실 결번"
-                                          className="flex h-full select-none items-center justify-center rounded border border-slate-300 bg-slate-200/80 font-mono text-[9px] font-semibold text-slate-500"
-                                        >
-                                          설비
-                                        </div>
-                                      );
-                                    }
-
-                                    const room = roomMap.get(roomNo);
-                                    if (!room) return <div key={roomNo} className="h-full min-w-0" />;
-
-                                    const typeCode =
-                                      room.roomType === 'EXECUTIVE_DOUBLE' ? 'EXC' :
-                                      room.roomType === 'SUPERIOR_TWIN' ? 'TWN' :
-                                      room.roomType === 'RESIDENTIAL_DOUBLE' ? 'RSD' :
-                                      room.roomType === 'SUPERIOR_DOUBLE' ? 'SDB' : 'MOD';
-
-                                    return (
-                                      <div
-                                        key={room.roomNumber}
-                                        title={`[${room.roomNumber}호] ${room.roomTypeName}\n상태: ${room.status}${room.guestName ? `\n고객명: ${room.guestName}` : ''}`}
-                                        className={`flex h-full min-w-0 select-none flex-col justify-between rounded border px-1 py-0.5 shadow-2xs transition hover:brightness-95 ${getStatusClass(room.status)}`}
-                                      >
-                                        <div className="flex items-center justify-between border-b border-black/5 pb-0.5 leading-none">
-                                          <span className="font-mono text-[11px] font-extrabold tracking-tight text-slate-900">
-                                            {room.roomNumber}
-                                          </span>
-                                          <span className="font-mono text-[8px] font-bold opacity-60">
-                                            {typeCode}
-                                          </span>
-                                        </div>
-
-                                        <div className="truncate text-center text-[9px] font-semibold leading-none pt-0.5">
-                                          {room.guestName ? (
-                                            <span className="truncate">{room.guestName}</span>
-                                          ) : (
-                                            <span className="opacity-40">-</span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                              <div className="flex items-center justify-between border-b border-black/5 pb-0.5 leading-none">
+                                <span className="font-mono text-[11px] font-extrabold tracking-tight text-slate-900">
+                                  {room.roomNumber}
+                                </span>
+                                <span className="font-mono text-[8px] font-bold opacity-60">
+                                  {typeCode}
+                                </span>
                               </div>
-                            );
-                          })}
-                      </div>
+
+                              <div className="truncate text-center text-[9px] font-semibold leading-none pt-0.5">
+                                {room.guestName ? (
+                                  <span className="truncate">{room.guestName}</span>
+                                ) : (
+                                  <span className="opacity-40">-</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }}
+                      />
                     </div>
                   )}
                 </div>
@@ -520,22 +516,60 @@ export default function App() {
                 />
               )}
 
-              {/* 3. 일괄 배정 탭 */}
+              {/* 3. 일괄 배정 / 해제 탭 */}
               {activeTab === 'BATCH_ASSIGN' && (
                 <div className="max-w-[560px] rounded border border-slate-300 bg-white p-6 shadow-xs">
-                  <h2 className="mb-1.5 text-base font-bold text-slate-900">규칙 기반 일괄 자동 배정</h2>
-                  <p className="mb-5 text-xs text-slate-600 leading-relaxed">
-                    호텔 공식 영업일자({businessDate}) 기준 미배정 예약 전체를 대상으로 선호도 및 연박 보호 규칙을 계산하여 빈 객실을 자동 배정합니다.
+                  <h2 className="mb-1.5 text-base font-bold text-slate-900">일괄 자동 배정 / 일괄 해제</h2>
+                  <p className="mb-4 text-xs leading-relaxed text-slate-600">
+                    선택한 체크인 일자의 예약을 한 번에 배정하거나, 배정을 한 번에 해제합니다. 진행하는 동안 모든 직원의 예약 화면은 조회만 가능합니다.
                   </p>
-                  <button
-                    onClick={handleBatchAssign}
-                    disabled={isAssigning}
-                    className={`flex w-full items-center justify-center gap-2 rounded p-2.5 text-xs font-bold transition ${
-                      isAssigning ? 'cursor-not-allowed bg-slate-200 text-slate-500' : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                  >
-                    {isAssigning ? '일괄 분석 및 배정 진행 중...' : `${businessDate} 미배정 예약 일괄 배정 실행`}
-                  </button>
+
+                  <label className="mb-1 block text-[11px] font-semibold text-slate-600">체크인 일자</label>
+                  <input
+                    type="date"
+                    value={batchTargetDate}
+                    onChange={(e) => setBatchTargetDate(e.target.value)}
+                    className="mb-4 w-full rounded border border-slate-300 bg-white p-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                  />
+                  {batchTargetDate && batchTargetDate !== businessDate && (
+                    <p className="-mt-2 mb-4 text-[11px] text-amber-700">
+                      선택한 일자가 현재 영업일자({businessDate})와 다릅니다.
+                    </p>
+                  )}
+
+                  {batchStatus.active && !isAssigning && !isUnassigning && (
+                    <p className="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                      <b>{batchStatus.label}</b>이(가) 진행 중입니다 (실행: {batchStatus.staffId}, 대상 {batchStatus.targetDate}). 끝난 뒤 실행할 수 있습니다.
+                    </p>
+                  )}
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={handleBatchAssign}
+                      disabled={isAssigning || isUnassigning || batchStatus.active}
+                      className={`flex w-full items-center justify-center gap-2 rounded p-2.5 text-xs font-bold transition ${
+                        isAssigning || isUnassigning || batchStatus.active
+                          ? 'cursor-not-allowed bg-slate-200 text-slate-500'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      {isAssigning ? '일괄 분석 및 배정 진행 중...' : `${batchTargetDate || '일자 선택'} 미배정 예약 일괄 배정 실행`}
+                    </button>
+                    <button
+                      onClick={handleBatchUnassign}
+                      disabled={isAssigning || isUnassigning || batchStatus.active}
+                      className={`flex w-full items-center justify-center gap-2 rounded border p-2.5 text-xs font-bold transition ${
+                        isAssigning || isUnassigning || batchStatus.active
+                          ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                          : 'border-rose-300 bg-white text-rose-700 hover:bg-rose-50'
+                      }`}
+                    >
+                      {isUnassigning ? '일괄 배정 해제 진행 중...' : `${batchTargetDate || '일자 선택'} 배정 일괄 해제`}
+                    </button>
+                  </div>
+                  <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+                    해제는 배정 완료 상태의 예약만 미배정으로 되돌립니다. 이미 체크인했거나 퇴실한 예약, 취소된 예약은 그대로 둡니다.
+                  </p>
                 </div>
               )}
 

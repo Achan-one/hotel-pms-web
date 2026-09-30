@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Tag as TagIcon, PlusCircle, Layers, Trash2, RefreshCw, X, SlidersHorizontal, Shield, Settings2, Edit3 } from 'lucide-react';
 import apiClient from '../api/client';
 import { pmsService } from '../api/pmsService';
+import RoomTagMatrixView from './RoomTagMatrixView';
 
 export interface RoomTagItem {
   code: string;
@@ -30,6 +31,8 @@ interface TagManagementViewProps {
 }
 
 export default function TagManagementView({ canRegister }: TagManagementViewProps) {
+  // 태그 사전(목록/편집)과 객실 매트릭스(방마다 어떤 태그가 있는지) 두 화면을 탭으로 나눈다.
+  const [subTab, setSubTab] = useState<'DICTIONARY' | 'MATRIX'>('DICTIONARY');
   const [tagList, setTagList] = useState<RoomTagItem[]>([]);
   const [listLoading, setListLoading] = useState(false);
 
@@ -216,8 +219,28 @@ export default function TagManagementView({ canRegister }: TagManagementViewProp
     }
   };
 
+  const subTabClass = (tab: 'DICTIONARY' | 'MATRIX') =>
+    `rounded-t border border-b-0 px-4 py-1.5 text-xs font-bold transition ${
+      subTab === tab
+        ? 'border-slate-300 bg-white text-blue-700'
+        : 'border-transparent bg-transparent text-slate-500 hover:text-slate-800'
+    }`;
+
   return (
     <div className="flex w-full flex-col gap-3 font-sans text-slate-800">
+      <div className="flex gap-1 border-b border-slate-300">
+        <button type="button" className={subTabClass('DICTIONARY')} onClick={() => setSubTab('DICTIONARY')}>
+          태그 사전
+        </button>
+        <button type="button" className={subTabClass('MATRIX')} onClick={() => setSubTab('MATRIX')}>
+          객실 매트릭스
+        </button>
+      </div>
+
+      {subTab === 'MATRIX' && <RoomTagMatrixView />}
+
+      {subTab === 'DICTIONARY' && (
+      <>
       {/* 1. 상단 타이틀 바 */}
       <div className="flex items-center justify-between rounded border border-slate-300 bg-white px-4 py-3 shadow-2xs">
         <div className="flex items-center gap-3">
@@ -764,6 +787,8 @@ export default function TagManagementView({ canRegister }: TagManagementViewProp
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

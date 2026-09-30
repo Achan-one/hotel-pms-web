@@ -12,6 +12,8 @@ interface Props {
   businessDate: string;
   onBack: () => void;
   onUpdated: () => void;
+  // 일괄 배정, 해제가 진행 중이면 그 작업 정보. 진행 중에는 누가 열든 읽기 전용이다.
+  batchLock?: { label: string; staffId: string } | null;
 }
 
 const formatRoomNumber = (val: string) => {
@@ -22,12 +24,17 @@ const formatRoomNumber = (val: string) => {
   return trimmed;
 };
 
-export default function ReservationDetailView({ reservation: initialReservation, businessDate, onBack, onUpdated }: Props) {
+export default function ReservationDetailView({ reservation: initialReservation, businessDate, onBack, onUpdated, batchLock = null }: Props) {
   const [activeTab, setActiveTab] = useState<'OPERATIONAL' | 'FOLIO_LEDGER' | 'CONTRACT_AUDIT'>('OPERATIONAL');
   const [reservation, setReservation] = useState<ReservationDetailDto>(initialReservation);
 
-  const [isLockedByOther, setIsLockedByOther] = useState(false);
+  // 다른 직원이 이 예약을 편집 중인지(서버 편집 락). 일괄 작업 중인 경우는 batchLock으로 따로 다룬다.
+  const [isLockedByOtherStaff, setIsLockedByOtherStaff] = useState(false);
   const [lockHolderName, setLockHolderName] = useState('');
+  const batchActive = Boolean(batchLock);
+
+  // 화면이 읽기 전용이어야 하는 모든 경우: 다른 직원이 편집 중이거나 일괄 작업이 진행 중이다.
+  const isLockedByOther = isLockedByOtherStaff || batchActive;
 
   const [opGuestName, setOpGuestName] = useState('');
   const [opCheckIn, setOpCheckIn] = useState('');
@@ -64,13 +71,19 @@ export default function ReservationDetailView({ reservation: initialReservation,
     const currentStaffId = userObj?.staffId || 'anonymous';
     const currentStaffName = userObj?.staffName || currentStaffId;
 
+    // 일괄 작업 중에는 편집 락을 잡지 않고 조회만 한다. 끝나면 이 효과가 다시 실행되어 락을 잡고 편집이 가능해진다.
+    if (batchActive) {
+      setIsLockedByOtherStaff(false);
+      return;
+    }
+
     pmsService.acquireLock(initialReservation.reservationId, currentStaffId, currentStaffName)
       .then((res) => {
-        if (res.isLockedByOther) {
-          setIsLockedByOther(true);
+        if (res.isLockedByOther && !res.lockedByBatch) {
+          setIsLockedByOtherStaff(true);
           setLockHolderName(res.lockedByStaffName);
         } else {
-          setIsLockedByOther(false);
+          setIsLockedByOtherStaff(false);
         }
       })
       .catch((e) => {
@@ -80,7 +93,7 @@ export default function ReservationDetailView({ reservation: initialReservation,
     return () => {
       void pmsService.releaseLock(initialReservation.reservationId, currentStaffId);
     };
-  }, [initialReservation.reservationId]);
+  }, [initialReservation.reservationId, batchActive]);
 
   useEffect(() => {
     apiClient.get('/api/admin/tags')
@@ -452,9 +465,15 @@ export default function ReservationDetailView({ reservation: initialReservation,
         <div className="flex items-center justify-between rounded border border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900 shadow-2xs">
           <div className="flex items-center gap-2">
             <Lock size={16} className="text-amber-700" />
-            <span>
-              현재 <b>[{lockHolderName}]</b> 스탭이 이 예약을 편집하고 있습니다. <b>읽기 전용 (미리보기 모드)</b>으로 열렸습니다.
-            </span>
+            {batchActive ? (
+              <span>
+                <b>[{batchLock?.label}]</b>이(가) 진행 중입니다 (실행: {batchLock?.staffId}). 끝날 때까지 <b>읽기 전용 (미리보기 모드)</b>입니다.
+              </span>
+            ) : (
+              <span>
+                현재 <b>[{lockHolderName}]</b> 스탭이 이 예약을 편집하고 있습니다. <b>읽기 전용 (미리보기 모드)</b>으로 열렸습니다.
+              </span>
+            )}
           </div>
           <span className="flex items-center gap-1 rounded bg-white/80 border border-amber-300 px-2 py-0.5 text-[11px] font-bold text-amber-800">
             <Eye size={12} /> 미리보기 전용

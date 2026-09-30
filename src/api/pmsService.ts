@@ -1,5 +1,7 @@
 import apiClient from './client';
-import type { ApiResponse, FloorMapResponseDto, LoginResponse, StaffRole } from '../types/pms';
+import type {
+  ApiResponse, BatchStatus, BatchUnassignResult, FloorMapResponseDto, LoginResponse, StaffRole, TagCatalogItem,
+} from '../types/pms';
 
 export interface TagPreferenceDto {
   preferredTags: string[];
@@ -230,8 +232,8 @@ export const pmsService = {
     reservationId: string,
     staffId: string,
     staffName: string
-  ): Promise<{ isLockedByOther: boolean; lockedByStaffName: string }> => {
-    const res = await apiClient.post<ApiResponse<{ isLockedByOther: boolean; lockedByStaffName: string }>>(
+  ): Promise<{ isLockedByOther: boolean; lockedByStaffName: string; lockedByBatch?: boolean }> => {
+    const res = await apiClient.post<ApiResponse<{ isLockedByOther: boolean; lockedByStaffName: string; lockedByBatch?: boolean }>>(
       `/api/reservations/${reservationId}/lock`,
       { staffId, staffName }
     );
@@ -295,6 +297,24 @@ export const pmsService = {
       checkInDate,
     });
     return res.data;
+  },
+
+  // 체크인 일자가 checkInDate인 배정 완료 예약을 모두 미배정으로 되돌린다. 체크인한 예약은 그대로 둔다.
+  runBatchUnassign: async (checkInDate: string): Promise<ApiResponse<BatchUnassignResult>> => {
+    const res = await apiClient.post<ApiResponse<BatchUnassignResult>>('/api/reservations/batch-unassign', {
+      checkInDate,
+    });
+    return res.data;
+  },
+
+  getBatchStatus: async (): Promise<BatchStatus> => {
+    const res = await apiClient.get<ApiResponse<BatchStatus>>('/api/reservations/batch-status');
+    return res.data.data;
+  },
+
+  getTagCatalog: async (): Promise<TagCatalogItem[]> => {
+    const res = await apiClient.get<ApiResponse<TagCatalogItem[]>>('/api/rooms/tag-catalog');
+    return res.data.data;
   },
 
   checkIn: async (reservationId: string) => {
