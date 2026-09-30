@@ -74,7 +74,7 @@ export interface TagCatalogItem {
 // 일괄 배정, 해제가 서버에서 진행 중인지. 진행 중이면 예약은 조회만 할 수 있다.
 export interface BatchStatus {
     active: boolean;
-    operation?: 'BATCH_ASSIGN' | 'BATCH_UNASSIGN';
+    operation?: 'BATCH_ASSIGN' | 'BATCH_UNASSIGN' | 'TEST_DATA_GENERATION';
     label?: string;
     staffId?: string;
     targetDate?: string;
