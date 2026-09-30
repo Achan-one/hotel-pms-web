@@ -39,6 +39,8 @@ export interface CityLedgerRecordDto {
 
 export interface ReservationDetailDto {
   reservationId: string;
+  // PMS가 발급한 예약 번호. 예약ID(OTA에서 온 값일 수 있음)와 별개이고 저장할 때 한 번 정해진다.
+  pmsReservationNo?: string;
   originalGuestName?: string;
   bookedRoomType?: string;
   contractCheckInDate?: string;
@@ -497,6 +499,15 @@ export const pmsService = {
       responseType: 'blob',
     });
     triggerFileDownload(res.data, '태그별_보유객실매핑_매트릭스.csv');
+  },
+
+  // 관리자 전용: 선택한 체크인 일자의 배정 예약별 점수 내역 (총점과 규칙별 점수)
+  downloadAssignmentScoresCsv: async (checkInDate: string) => {
+    const res = await apiClient.get('/api/reports/assignment-scores/csv', {
+      params: { checkInDate },
+      responseType: 'blob',
+    });
+    triggerFileDownload(res.data, `배정점수내역_${checkInDate}.csv`);
   },
 
   getSystemBusinessDate: async (): Promise<string> => {

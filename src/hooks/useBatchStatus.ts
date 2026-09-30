@@ -13,12 +13,15 @@ const POLL_INTERVAL_MS = 3000;
 export function useBatchStatus(enabled: boolean, onFinished?: () => void): BatchStatus {
   const [status, setStatus] = useState<BatchStatus>(IDLE);
   const wasActive = useRef(false);
+
+  // 최신 콜백을 ref에 담아 두되, 렌더링 도중이 아니라 렌더링이 끝난 뒤(효과)에 갱신한다.
   const onFinishedRef = useRef(onFinished);
-  onFinishedRef.current = onFinished;
+  useEffect(() => {
+    onFinishedRef.current = onFinished;
+  }, [onFinished]);
 
   useEffect(() => {
     if (!enabled) {
-      setStatus(IDLE);
       wasActive.current = false;
       return;
     }
@@ -46,5 +49,6 @@ export function useBatchStatus(enabled: boolean, onFinished?: () => void): Batch
     };
   }, [enabled]);
 
-  return status;
+  // 로그아웃 등으로 비활성화되면 마지막으로 받은 상태가 남지 않도록 항상 유휴 상태로 돌려준다.
+  return enabled ? status : IDLE;
 }

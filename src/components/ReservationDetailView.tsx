@@ -495,7 +495,13 @@ export default function ReservationDetailView({ reservation: initialReservation,
               {reservation.operationalGuestName || reservation.guestName}
             </h2>
             <div className="mt-0.5 flex items-center gap-2 font-mono text-xs">
+              {reservation.pmsReservationNo && (
+                <span className="font-bold text-slate-800" title="PMS가 발급한 예약 번호">{reservation.pmsReservationNo}</span>
+              )}
               <span className="text-slate-500">ID: {reservation.reservationId}</span>
+              {reservation.channelInfo?.channelReservationNo && reservation.channelInfo.channelReservationNo !== reservation.reservationId && (
+                <span className="text-slate-500" title="OTA(채널) 예약번호">OTA: {reservation.channelInfo.channelReservationNo}</span>
+              )}
               <span className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-700">
                 {reservation.status}
               </span>

@@ -14,7 +14,7 @@ import RoomMatrixGrid from './components/RoomMatrixGrid';
 import { buildTagNameMap, roomTooltip } from './components/tagDisplay';
 import { useBatchStatus } from './hooks/useBatchStatus';
 import {
-  LogIn, RefreshCw, Hotel, Clock, Plus, Trash2, ListChecks, CheckCircle2, AlertCircle, Lock
+  LogIn, RefreshCw, Hotel, Clock, Plus, Trash2, ListChecks, CheckCircle2, AlertCircle, Lock, FileDown
 } from 'lucide-react';
 
 export default function App() {
@@ -41,6 +41,7 @@ export default function App() {
   // 일괄 배정, 해제 대상 체크인 일자. 영업일과 다른 날짜도 고를 수 있다.
   const [batchTargetDate, setBatchTargetDate] = useState('2026-09-20');
   const [isUnassigning, setIsUnassigning] = useState(false);
+  const [isExportingScores, setIsExportingScores] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isNightAuditing, setIsNightAuditing] = useState(false);
   const [assignToast, setAssignToast] = useState<{ message: string; isError?: boolean } | null>(null);
@@ -182,6 +183,22 @@ export default function App() {
   const showToast = (message: string, isError = false) => {
     setAssignToast({ message, isError });
     setTimeout(() => setAssignToast(null), 5000);
+  };
+
+  // 관리자 전용: 배정 점수 내역을 CSV로 내려받는다. 서버도 관리자만 허용하므로 화면 표시는 편의일 뿐이다.
+  const handleExportAssignmentScores = async () => {
+    if (!batchTargetDate) {
+      showToast('체크인 일자를 선택해 주세요.', true);
+      return;
+    }
+    setIsExportingScores(true);
+    try {
+      await pmsService.downloadAssignmentScoresCsv(batchTargetDate);
+    } catch (err: unknown) {
+      showToast(errorMessageOf(err, '배정 점수 내역 내보내기에 실패했습니다.'), true);
+    } finally {
+      setIsExportingScores(false);
+    }
   };
 
   const handleBatchAssign = async () => {
@@ -570,6 +587,29 @@ export default function App() {
                   <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
                     해제는 배정 완료 상태의 예약만 미배정으로 되돌립니다. 이미 체크인했거나 퇴실한 예약, 취소된 예약은 그대로 둡니다.
                   </p>
+
+                  {/* 관리자 전용: 배정 점수 내역. 배정 규칙의 계산 방식이 드러나므로 일반 직원에게는 보이지 않는다. */}
+                  {currentUser?.role === 'ROLE_ADMIN' && (
+                    <div className="mt-5 rounded border border-slate-300 bg-slate-50 p-3">
+                      <div className="mb-1 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                        <FileDown size={14} className="text-slate-600" />
+                        배정 점수 내역 내보내기
+                        <span className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">관리자 전용</span>
+                      </div>
+                      <p className="mb-2 text-[11px] leading-relaxed text-slate-500">
+                        위에서 선택한 체크인 일자의 배정 예약마다 총점과 규칙별 점수(선호 태그, 감점, 연박 가중 등)를 CSV로 받습니다.
+                        배정된 방의 점수 내역이며, 배정 당시 다른 후보 방과의 비교는 포함하지 않습니다. 투숙객 이름은 들어 있지 않습니다.
+                      </p>
+                      <button
+                        onClick={handleExportAssignmentScores}
+                        disabled={isExportingScores}
+                        className="flex w-full items-center justify-center gap-1.5 rounded bg-slate-800 p-2 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:bg-slate-200 disabled:text-slate-400"
+                      >
+                        <FileDown size={13} />
+                        {isExportingScores ? '생성 중...' : `${batchTargetDate || '일자 선택'} 배정 점수 내역 CSV`}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

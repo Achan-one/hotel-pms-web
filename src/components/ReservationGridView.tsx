@@ -11,7 +11,7 @@ interface Props {
   onSelectReservation: (reservation: ReservationDetailDto) => void;
 }
 
-type SortField = 'roomNumber' | 'guestName' | 'reservationId' | 'checkInDate' | 'stayNights' | 'status' | 'channel';
+type SortField = 'pmsReservationNo' | 'otaReservationNo' | 'roomNumber' | 'guestName' | 'reservationId' | 'checkInDate' | 'stayNights' | 'status' | 'channel';
 type SortOrder = 'asc' | 'desc';
 
 const GRID_STATE_SESSION_KEY = 'PMS_RESERVATION_GRID_STATE_V1';
@@ -46,9 +46,11 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
 
   // 4. 컬럼 너비 동적 조절 상태
   const [colWidths, setColWidths] = useState({
+    pmsReservationNo: 160,
     roomNumber: 75,
     status: 90,
     channel: 110,
+    otaReservationNo: 150,
     reservationId: 130,
     guestName: 140,
     roomType: 140,
@@ -187,6 +189,14 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
       let valB: string | number = '';
 
       switch (sortField) {
+        case 'pmsReservationNo':
+          valA = a.pmsReservationNo || '';
+          valB = b.pmsReservationNo || '';
+          break;
+        case 'otaReservationNo':
+          valA = a.channelInfo?.channelReservationNo || '';
+          valB = b.channelInfo?.channelReservationNo || '';
+          break;
         case 'roomNumber':
           valA = a.assignedRoomNumber ? a.assignedRoomNumber : '9999';
           valB = b.assignedRoomNumber ? b.assignedRoomNumber : '9999';
@@ -399,10 +409,11 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] font-semibold text-slate-600">예약ID</label>
+            <label className="mb-1 block text-[11px] font-semibold text-slate-600">예약번호</label>
             <input
               type="text"
-              placeholder="예약번호"
+              title="PMS 예약번호, OTA 예약번호, 예약ID 어느 것으로든 검색됩니다."
+              placeholder="PMS / OTA / 예약ID"
               value={searchReservationId}
               onChange={(e) => { const v = e.target.value; setSearchReservationId(v); void executeSearch(searchGuestName, v, searchCheckInDate, searchStayingDate, searchStatus, searchTag, searchOta); }}
               className="w-full rounded border border-slate-300 bg-white p-1 font-mono text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
@@ -476,6 +487,14 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
             <thead>
               <tr className="border-b border-slate-300 bg-slate-100 text-slate-700 select-none">
                 
+                {/* 0. PMS 예약번호 (PMS가 발급한 번호, 항상 첫 열) */}
+                <th style={{ width: colWidths.pmsReservationNo }} className="relative px-3 py-2 cursor-pointer hover:bg-slate-200">
+                  <div onClick={() => handleSort('pmsReservationNo')} className="flex items-center gap-1 font-bold">
+                    PMS 예약번호 {renderSortIcon('pmsReservationNo')}
+                  </div>
+                  <div onMouseDown={(e) => handleMouseDownResize(e, 'pmsReservationNo')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
+                </th>
+
                 {/* 1. 호실 */}
                 <th style={{ width: colWidths.roomNumber }} className="relative px-3 py-2 cursor-pointer hover:bg-slate-200">
                   <div onClick={() => handleSort('roomNumber')} className="flex items-center gap-1 font-bold">
@@ -498,6 +517,14 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
                     <Globe size={11} /> 예약 채널 {renderSortIcon('channel')}
                   </div>
                   <div onMouseDown={(e) => handleMouseDownResize(e, 'channel')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
+                </th>
+
+                {/* 3-1. OTA 예약번호 */}
+                <th style={{ width: colWidths.otaReservationNo }} className="relative px-3 py-2 cursor-pointer hover:bg-slate-200">
+                  <div onClick={() => handleSort('otaReservationNo')} className="flex items-center gap-1 font-bold">
+                    OTA 예약번호 {renderSortIcon('otaReservationNo')}
+                  </div>
+                  <div onMouseDown={(e) => handleMouseDownResize(e, 'otaReservationNo')} className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400" />
                 </th>
 
                 {/* 4. 예약 ID */}
@@ -549,20 +576,20 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
               {/* 아무 조건도 선택되지 않은 상태 */}
               {!hasValidSearchCondition ? (
                 <tr>
-                  <td colSpan={9} className="p-16 text-center text-slate-500">
+                  <td colSpan={11} className="p-16 text-center text-slate-500">
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-3 border border-slate-300">
                       <AlertCircle size={26} />
                     </div>
                     <p className="text-sm font-bold text-slate-800">검색이 시작되지 않음</p>
                     <p className="text-xs text-slate-500 mt-1.5">
                       수십만 건의 대용량 예약 조회로 인한 시스템 부하를 방지하기 위해 전체 조회가 차단되어 있습니다.<br />
-                      상단 검색창에 <b>성명, 예약ID</b>를 입력하거나 <b>상태, 채널, 일자</b>를 선택해 주세요.
+                      상단 검색창에 <b>성명, 예약번호(PMS/OTA/예약ID)</b>를 입력하거나 <b>상태, 채널, 일자</b>를 선택해 주세요.
                     </p>
                   </td>
                 </tr>
               ) : filteredAndSortedList.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-14 text-center text-slate-400">
+                  <td colSpan={11} className="p-14 text-center text-slate-400">
                     <Search size={24} className="mx-auto mb-1.5 block opacity-30" />
                     지정한 조건과 일치하는 예약 내역이 없습니다.
                   </td>
@@ -584,12 +611,18 @@ export default function ReservationGridView({ businessDate, onSelectReservation 
                       title="클릭하여 예약 상세 및 편집 열기"
                       className="cursor-pointer border-b border-slate-200 transition hover:bg-blue-50/80 active:bg-blue-100"
                     >
+                      <td className="px-3 py-2 font-mono text-[11px] font-semibold text-slate-800 truncate" title={res.pmsReservationNo}>
+                        {res.pmsReservationNo || '-'}
+                      </td>
                       <td className={`px-3 py-2 font-mono font-bold ${res.assignedRoomNumber ? 'text-blue-700' : 'text-slate-400'}`}>
                         {res.assignedRoomNumber ? `${res.assignedRoomNumber}호` : '-'}
                       </td>
                       <td className="px-3 py-2">{getStatusBadge(res.status)}</td>
                       <td className="px-3 py-2">{getOtaBadge(res.channelInfo?.channelType)}</td>
-                      <td className="px-3 py-2 font-mono text-slate-600">{res.reservationId}</td>
+                      <td className="px-3 py-2 font-mono text-slate-600 truncate" title={res.channelInfo?.channelReservationNo}>
+                        {res.channelInfo?.channelReservationNo || '-'}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-slate-600 truncate" title={res.reservationId}>{res.reservationId}</td>
                       <td className="px-3 py-2 font-semibold text-slate-900 truncate">{res.operationalGuestName || res.guestName}</td>
                       <td className="px-3 py-2 text-slate-600 truncate">{res.roomType || res.bookedRoomType}</td>
                       <td className="px-3 py-2 text-slate-600">{res.checkInDate}</td>
